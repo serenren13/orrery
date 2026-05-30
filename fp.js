@@ -191,8 +191,9 @@ function drawRing(radius, selected) {
   webgl_context.uniform1i(uniform_shading_enabled, 0);
   webgl_context.uniform4f(uniform_trans, 0.0, 0.0, 0.0, 1.0);
 
-  if (selected) {
-    const { r, g, b } = hexToRgb(PLANET_DATA[selected_planet].color);
+  const { r, g, b } = hexToRgb(PLANET_DATA[planetIndex].color);
+
+  if (selected || view_mode === 'orrery') {
     const passes = [
       { scale: radius * 1.06, alpha: 0.06 },
       { scale: radius * 1.025, alpha: 0.18 },
@@ -598,7 +599,7 @@ function draw() {
       document.getElementById("live-z").textContent = pz.toFixed(2);
     }
 
-    drawRing(PLANET_DATA[i].r, i === selected_planet);
+    drawRing(PLANET_DATA[i].r, i, i === selected_planet);
     restoreSphereBuffer();
 
     drawSphere(px, 0, pz, p.sz, radians(p.rot), p.tex, p.shade, 1.0);
