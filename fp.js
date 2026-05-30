@@ -161,75 +161,66 @@ function configure() {
 // ============================================================
 function drawOverlayRings() {
   if (!overlay_ctx || !_last_VP || !_last_P) return;
-
   overlay_ctx.clearRect(0, 0, overlay_canvas.width, overlay_canvas.height);
 
-  const fov_rad = fov * Math.PI / 180;
-  const half_h = overlay_canvas.height / 2;
-  const focal = half_h / Math.tan(fov_rad / 2);
+  const STEPS = 64;
 
   for (let i = 0; i < PLANET_DATA.length; i++) {
     const p = PLANET_DATA[i];
     const isSelected = i === selected_planet;
     const color = p.color;
 
-    // Project center (sun at origin) to screen
-    const center = worldToScreen(0, 0, 0);
-    if (!center) continue;
+    // Sample 64 points around the 3D orbit ring and project each to screen
+    const points = [];
+    for (let j = 0; j <= STEPS; j++) {
+      const angle = (j / STEPS) * Math.PI * 2;
+      const wx = p.r * Math.cos(angle);
+      const wz = p.r * Math.sin(angle);
+      const sp = worldToScreen(wx, 0, wz);
+      if (sp) points.push(sp);
+    }
 
-    // Project a point on the ring edge to get screen radius
-    const edge = worldToScreen(p.r, 0, 0);
-    if (!edge) continue;
-
-    const dx = edge.x - center.x;
-    const dy = edge.y - center.y;
-    const screenRadius = Math.sqrt(dx*dx + dy*dy);
-    if (screenRadius < 1) continue;
-
-    // Determine ellipse Y scale based on camera elevation
-    // The ring is flat (y=0 plane), so we need the projected Y compression
-    const top = worldToScreen(0, 0, p.r);
-    if (!top) continue;
-    const topDy = Math.abs(top.y - center.y);
-    const radiusY = topDy;
-
-    overlay_ctx.save();
-    overlay_ctx.translate(center.x, center.y);
+    if (points.length < 3) continue;
 
     if (isSelected) {
-      // Glowing selected ring — multiple passes
-      const glowPasses = [
-        { width: 6, alpha: 0.08 },
-        { width: 3, alpha: 0.15 },
-        { width: 1.5, alpha: 0.5 },
-        { width: 0.8, alpha: 0.9 },
-      ];
-      for (const pass of glowPasses) {
+      // Two passes — outer glow then crisp line
+      for (const pass of [
+        { width: 4, alpha: 0.25, blur: 14 },
+        { width: 1.2, alpha: 0.9, blur: 6 },
+      ]) {
+        overlay_ctx.save();
         overlay_ctx.beginPath();
-        overlay_ctx.ellipse(0, 0, screenRadius, Math.max(radiusY, 1), 0, 0, Math.PI * 2);
+        overlay_ctx.moveTo(points[0].x, points[0].y);
+        for (let k = 1; k < points.length; k++) {
+          overlay_ctx.lineTo(points[k].x, points[k].y);
+        }
+        overlay_ctx.closePath();
         overlay_ctx.strokeStyle = color;
         overlay_ctx.lineWidth = pass.width;
         overlay_ctx.globalAlpha = pass.alpha;
         overlay_ctx.shadowColor = color;
-        overlay_ctx.shadowBlur = isSelected ? 12 : 0;
+        overlay_ctx.shadowBlur = pass.blur;
         overlay_ctx.stroke();
+        overlay_ctx.restore();
       }
     } else {
-      // Dim unselected ring
+      overlay_ctx.save();
       overlay_ctx.beginPath();
-      overlay_ctx.ellipse(0, 0, screenRadius, Math.max(radiusY, 1), 0, 0, Math.PI * 2);
-      overlay_ctx.strokeStyle = "#4a6a9a";
+      overlay_ctx.moveTo(points[0].x, points[0].y);
+      for (let k = 1; k < points.length; k++) {
+        overlay_ctx.lineTo(points[k].x, points[k].y);
+      }
+      overlay_ctx.closePath();
+      overlay_ctx.strokeStyle = '#2a4a7a';
       overlay_ctx.lineWidth = 0.6;
-      overlay_ctx.globalAlpha = 0.35;
+      overlay_ctx.globalAlpha = 0.4;
       overlay_ctx.shadowBlur = 0;
       overlay_ctx.stroke();
+      overlay_ctx.restore();
     }
-
-    overlay_ctx.restore();
   }
   overlay_ctx.globalAlpha = 1.0;
 }
-
 // ============================================================
 // Vertex/Normal/TexCoord data
 // ============================================================
@@ -673,6 +664,8 @@ function stopGrandTour() {
 document.getElementById("reset_cl").addEventListener("click", function() {
   const v = VIEWS[view_mode];
   xt = v.x; yt = v.y; zt = v.z; fov = v.fov;
+  document.getElementById("fov").value = v.fov;
+  document.getElementById("fovy").textContent = v.fov + "°";
 });
 document.getElementById("reset_ss").addEventListener("click", function() {
   orbit_speed_crd = 1.0;

@@ -60,7 +60,9 @@ html, body {
 .planet-sym.active {
   color: var(--pcol);
   border-color: var(--pcol);
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.05);
+  text-shadow: 0 0 8px var(--pcol), 0 0 16px var(--pcol);
+  box-shadow: 0 0 8px var(--pcol), inset 0 0 6px rgba(255,255,255,0.04);
 }
 
 /* LEFT HUD */
