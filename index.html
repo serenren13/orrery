@@ -17,6 +17,17 @@
   <canvas id="webgl-canvas"></canvas>
   <div id="planet-label"></div>
 
+  <div class="planet-bar">
+    <span class="planet-sym" data-index="0" style="--pcol:#b5b5b5" title="Mercury">☿</span>
+    <span class="planet-sym" data-index="1" style="--pcol:#e8c97a" title="Venus">♀</span>
+    <span class="planet-sym active" data-index="2" style="--pcol:#2d7dd2" title="Earth">⊕</span>
+    <span class="planet-sym" data-index="3" style="--pcol:#c1440e" title="Mars">♂</span>
+    <span class="planet-sym" data-index="4" style="--pcol:#c88b3a" title="Jupiter">♃</span>
+    <span class="planet-sym" data-index="5" style="--pcol:#e4d191" title="Saturn">♄</span>
+    <span class="planet-sym" data-index="6" style="--pcol:#7de8e8" title="Uranus">⛢</span>
+    <span class="planet-sym" data-index="7" style="--pcol:#3f54ba" title="Neptune">♆</span>
+  </div>
+
   <div class="hud-left">
     <div class="hud-title">ORRERY</div>
     <div class="hud-subtitle">Milky Way Solar System</div>
@@ -72,18 +83,28 @@
     </div>
   </div>
 
-  <div class="sim-clock">
-    <div class="sim-clock-label">SIM DATE</div>
-    <div class="sim-clock-date" id="sim-date">29 MAY 2026</div>
-    <div class="sim-clock-day" id="sim-day">DAY 149</div>
-    <button class="tonight-btn" id="btn-tonight" onclick="use_real_positions ? deactivateRealPositions() : activateRealPositions()">
-      TONIGHT'S SKY
-    </button>
+  <div class="time-panel">
+    <div class="time-mode-row">
+      <button class="time-btn active" id="btn-simulated" onclick="setTimeMode('simulated')">SIMULATED</button>
+      <button class="time-btn" id="btn-live" onclick="setTimeMode('live')">LIVE</button>
+    </div>
+    <div class="sim-date-display" id="sim-date">30 MAY 2026</div>
+    <div class="sim-day-display" id="sim-day">DAY 150</div>
+    <div id="scrubber-section">
+      <div class="scrubber-labels"><span>1900</span><span>TODAY</span><span>2100</span></div>
+      <input type="range" id="date-scrubber" min="0" max="100" step="0.1" value="63">
+      <button class="snap-btn" onclick="snapToToday()">SNAP TO TODAY</button>
+    </div>
   </div>
 
   <div class="view-toggle">
-    <button class="toggle-btn active" id="btn-solar" onclick="setView('solar')">SOLAR VIEW</button>
+    <button class="toggle-btn active" id="btn-solar" onclick="setView('solar')">SOLAR</button>
+    <button class="toggle-btn" id="btn-system" onclick="setView('system')">SYSTEM</button>
     <button class="toggle-btn" id="btn-orrery" onclick="setView('orrery')">ORRERY</button>
+  </div>
+
+  <div class="tour-panel">
+    <div class="tour-label">AUTOMATION</div>
     <button class="toggle-btn tour" id="btn-tour" onclick="startGrandTour()">GRAND TOUR</button>
   </div>
 

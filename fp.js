@@ -35,28 +35,31 @@ let lerp_duration = 2000;
 let cam_lerping = false;
 let cam_lerp_done_cb = null;
 
-// Light at sun
 const lxt = 0.0, lyt = 0.0, lzt = 0.0;
 const up = vec3(0.0, 1.0, 0.0);
 
-// View mode
+// View mode: "solar" | "system" | "orrery"
 let view_mode = "solar";
-let selected_planet = 2; // Earth
+
+// Selected planet index
+let selected_planet = 2;
 
 // Grand tour
 let grand_tour_active = false;
 let grand_tour_index = 0;
 let grand_tour_timer = null;
 
-// Sim date
+// Time mode: "simulated" | "live"
+let time_mode = "simulated";
 let sim_date = new Date();
 let last_frame_time = performance.now();
 let use_real_positions = false;
-
-// Speed
 let orbit_speed_crd = 1.0;
 
-// Planet data
+// Scrubber: 0=1900, 100=2100
+const SCRUBBER_START_YEAR = 1900;
+const SCRUBBER_END_YEAR = 2100;
+
 const PLANET_DATA = [
   { name:"Mercury", sub:"first planet · sol system",   color:"#b5b5b5", period:"88 Earth days",       distance:"0.39 AU",  diameter:"4,879 km",   moons:"0",   desc:"Smallest planet. Extreme temperature swings from -180°C to 430°C.",                            tex:2,  sz:0.06, r:0.22, spd:4.147, rot:0, shade:1 },
   { name:"Venus",   sub:"second planet · sol system",  color:"#e8c97a", period:"225 Earth days",      distance:"0.72 AU",  diameter:"12,104 km",  moons:"0",   desc:"Hottest planet at 465°C average. Thick CO₂ atmosphere with sulfuric acid clouds.",            tex:3,  sz:0.09, r:0.30, spd:1.626, rot:0, shade:1 },
@@ -77,7 +80,8 @@ let sun_rot = 0;
 let stars_rot = 0;
 
 const VIEWS = {
-  solar:  { x:0.0, y:0.15, z:0.65, fov:60 },
+  solar:  { x:0.0, y:0.08, z:0.55, fov:55 },
+  system: { x:0.0, y:0.6,  z:0.8,  fov:70 },
   orrery: { x:0.0, y:1.8,  z:0.01, fov:75 },
 };
 
@@ -115,7 +119,6 @@ function configure() {
   attr_vertex   = webgl_context.getAttribLocation(program, "vertex");
   attr_normal   = webgl_context.getAttribLocation(program, "normal");
   attr_texCoord = webgl_context.getAttribLocation(program, "texCoord");
-
   uniform_color           = webgl_context.getUniformLocation(program, "color");
   uniform_view            = webgl_context.getUniformLocation(program, "V");
   uniform_perspective     = webgl_context.getUniformLocation(program, "P");
@@ -133,20 +136,19 @@ function configure() {
 
   buildRingBuffer();
   setupMouseInteraction();
-  updateInfoCard(selected_planet);
-  updateSimDateDisplay();
+  setupPlanetSymbols();
+  setupDateScrubber();
+  selectPlanet(2, false);
 
-  xt = VIEWS.solar.x;
-  yt = VIEWS.solar.y;
-  zt = VIEWS.solar.z;
-  fov = VIEWS.solar.fov;
+  const v = VIEWS.solar;
+  xt = v.x; yt = v.y; zt = v.z; fov = v.fov;
 }
 
 function buildRingBuffer() {
   let points = [];
   for (let i = 0; i <= RING_SEGMENTS; i++) {
-    let angle = (i / RING_SEGMENTS) * 2 * Math.PI;
-    points.push(Math.cos(angle), 0.0, Math.sin(angle));
+    const a = (i / RING_SEGMENTS) * 2 * Math.PI;
+    points.push(Math.cos(a), 0.0, Math.sin(a));
   }
   ring_buffer = webgl_context.createBuffer();
   webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
@@ -157,19 +159,16 @@ function drawRing(radius, alpha, selected) {
   webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
   webgl_context.vertexAttribPointer(attr_vertex, 3, webgl_context.FLOAT, false, 0, 0);
   webgl_context.uniform1i(uniform_shading_enabled, 0);
-  webgl_context.uniform1f(uniform_alpha, alpha);
   webgl_context.uniform4f(uniform_trans, 0.0, 0.0, 0.0, 1.0);
-  webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, radius);
-  // Draw multiple passes for glow effect on selected ring
   if (selected) {
     for (let pass = 3; pass >= 0; pass--) {
-      let r = radius + pass * 0.004;
-      let a = alpha * (1 - pass * 0.2);
-      webgl_context.uniform1f(uniform_alpha, a);
-      webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, r);
+      webgl_context.uniform1f(uniform_alpha, alpha * (1 - pass * 0.22));
+      webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, radius + pass * 0.005);
       webgl_context.drawArrays(webgl_context.LINE_STRIP, 0, RING_SEGMENTS + 1);
     }
   } else {
+    webgl_context.uniform1f(uniform_alpha, alpha);
+    webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, radius);
     webgl_context.drawArrays(webgl_context.LINE_STRIP, 0, RING_SEGMENTS + 1);
   }
 }
@@ -267,7 +266,7 @@ function drawSphere(tx, ty, tz, scale, rotY, texIndex, shading, alpha) {
 }
 
 function easeInOut(t) {
-  return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+  return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
 }
 
 function flyToPosition(tx, ty, tz, duration, onDone) {
@@ -279,18 +278,6 @@ function flyToPosition(tx, ty, tz, duration, onDone) {
   cam_lerp_done_cb = onDone || null;
   document.querySelector(".hud-left").classList.add("hidden");
   document.querySelector(".hud-right").classList.add("hidden");
-}
-
-function flyToPlanet(index, animate) {
-  selected_planet = index;
-  updateInfoCard(index);
-  const p = PLANET_DATA[index];
-  const pos = planet_positions[index];
-  const tx = pos.x * 0.9;
-  const ty = 0.08;
-  const tz = pos.z + p.sz * 4 + 0.15;
-  if (animate) flyToPosition(tx, ty, tz, 2000);
-  else { xt = tx; yt = ty; zt = tz; }
 }
 
 function tickLerp() {
@@ -308,6 +295,44 @@ function tickLerp() {
   }
 }
 
+// selectPlanet — the central function that links symbol + ring + card
+function selectPlanet(index, flyTo) {
+  selected_planet = index;
+  updateInfoCard(index);
+  updatePlanetSymbols(index);
+  pulseInfoCard(index);
+  if (flyTo) {
+    flyToPlanetSolar(index);
+  }
+}
+
+function flyToPlanetSolar(index) {
+  const p = PLANET_DATA[index];
+  const pos = planet_positions[index];
+  const tx = pos.x * 0.9;
+  const ty = VIEWS.solar.y;
+  const tz = pos.z + p.sz * 4 + 0.15;
+  setView('solar', false);
+  flyToPosition(tx, ty, tz, 2000);
+}
+
+function updatePlanetSymbols(index) {
+  document.querySelectorAll('.planet-sym').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+}
+
+function pulseInfoCard(index) {
+  const card = document.getElementById('info-card');
+  const color = PLANET_DATA[index].color;
+  card.style.borderColor = color;
+  card.style.transition = 'border-color 0.1s ease';
+  setTimeout(() => {
+    card.style.borderColor = '';
+    card.style.transition = 'border-color 0.8s ease';
+  }, 300);
+}
+
 function updateInfoCard(index) {
   const p = PLANET_DATA[index];
   document.getElementById("info-dot").style.background = p.color;
@@ -318,18 +343,94 @@ function updateInfoCard(index) {
   document.getElementById("info-diameter").textContent = p.diameter;
   document.getElementById("info-moons").textContent = p.moons;
   document.getElementById("info-desc").textContent = p.desc;
-  const liveSection = document.getElementById("live-section");
-  if (p.name === "Earth") liveSection.style.display = "block";
-  else liveSection.style.display = "none";
+  document.getElementById("live-section").style.display = p.name === "Earth" ? "block" : "none";
 }
 
-// Sim date
+// Planet symbol bar setup
+function setupPlanetSymbols() {
+  document.querySelectorAll('.planet-sym').forEach(el => {
+    el.addEventListener('click', function() {
+      const index = parseInt(this.dataset.index);
+      selectPlanet(index, true); // always fly in solar view
+    });
+  });
+}
+
+// Date scrubber
+function setupDateScrubber() {
+  const scrubber = document.getElementById('date-scrubber');
+  if (!scrubber) return;
+  // Set initial value to today
+  const today = new Date();
+  const totalYears = SCRUBBER_END_YEAR - SCRUBBER_START_YEAR;
+  const currentYears = today.getFullYear() - SCRUBBER_START_YEAR + (today.getMonth() / 12);
+  scrubber.value = (currentYears / totalYears) * 100;
+
+  scrubber.addEventListener('input', function() {
+    if (time_mode !== 'simulated') return;
+    const pct = parseFloat(this.value) / 100;
+    const year = SCRUBBER_START_YEAR + pct * (SCRUBBER_END_YEAR - SCRUBBER_START_YEAR);
+    const fullYear = Math.floor(year);
+    const month = Math.floor((year - fullYear) * 12);
+    sim_date = new Date(Date.UTC(fullYear, month, 1));
+    updateSimDateDisplay();
+    if (typeof getRealPlanetPositions === "function") {
+      use_real_positions = true;
+    }
+  });
+}
+
+function snapToToday() {
+  sim_date = new Date();
+  updateSimDateDisplay();
+  const scrubber = document.getElementById('date-scrubber');
+  if (scrubber) {
+    const today = new Date();
+    const totalYears = SCRUBBER_END_YEAR - SCRUBBER_START_YEAR;
+    const currentYears = today.getFullYear() - SCRUBBER_START_YEAR + (today.getMonth() / 12);
+    scrubber.value = (currentYears / totalYears) * 100;
+  }
+}
+
+// Time mode
+function setTimeMode(mode) {
+  time_mode = mode;
+  const simBtn = document.getElementById('btn-simulated');
+  const liveBtn = document.getElementById('btn-live');
+  const scrubSection = document.getElementById('scrubber-section');
+  const dateEl = document.getElementById('sim-date');
+
+  if (mode === 'live') {
+    simBtn.classList.remove('active');
+    liveBtn.classList.add('active', 'live');
+    scrubSection.style.display = 'none';
+    use_real_positions = true;
+    sim_date = new Date();
+    dateEl.classList.add('live-date');
+  } else {
+    liveBtn.classList.remove('active', 'live');
+    simBtn.classList.add('active');
+    scrubSection.style.display = 'block';
+    use_real_positions = false;
+    dateEl.classList.remove('live-date');
+  }
+}
+
 function updateSimDateDisplay() {
-  document.getElementById("sim-date").textContent = formatSimDate(sim_date);
-  document.getElementById("sim-day").textContent = "DAY " + getDayOfYear(sim_date);
+  if (typeof formatSimDate === "function") {
+    document.getElementById("sim-date").textContent = formatSimDate(sim_date);
+  }
+  if (typeof getDayOfYear === "function") {
+    document.getElementById("sim-day").textContent = "DAY " + getDayOfYear(sim_date);
+  }
 }
 
 function tickSimDate() {
+  if (time_mode === 'live') {
+    sim_date = new Date();
+    updateSimDateDisplay();
+    return;
+  }
   const now = performance.now();
   const real_ms = now - last_frame_time;
   last_frame_time = now;
@@ -339,19 +440,7 @@ function tickSimDate() {
   updateSimDateDisplay();
 }
 
-function activateRealPositions() {
-  use_real_positions = true;
-  sim_date = new Date();
-  updateSimDateDisplay();
-  document.getElementById("btn-tonight").classList.add("active");
-}
-
-function deactivateRealPositions() {
-  use_real_positions = false;
-  document.getElementById("btn-tonight").classList.remove("active");
-}
-
-// Hover label
+// Mouse interaction
 let hover_label = null;
 let _last_VP = null, _last_P = null;
 
@@ -361,23 +450,19 @@ function setupMouseInteraction() {
   canvas.addEventListener("mousemove", function(e) {
     if (!_last_VP || !_last_P) return;
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     let found = false;
     for (let i = 0; i < PLANET_DATA.length; i++) {
       const sp = worldToScreen(planet_positions[i].x, 0, planet_positions[i].z);
       if (!sp) continue;
       const dx = mx - sp.x, dy = my - sp.y;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      const screenR = Math.max(PLANET_DATA[i].sz * canvas.height * 0.4, 16);
-      if (dist < screenR) {
+      if (Math.sqrt(dx*dx+dy*dy) < Math.max(PLANET_DATA[i].sz * canvas.height * 0.4, 16)) {
         hover_label.style.display = "block";
         hover_label.style.left = (sp.x + 14) + "px";
         hover_label.style.top  = (sp.y - 8) + "px";
         hover_label.textContent = PLANET_DATA[i].name;
         canvas.style.cursor = "pointer";
-        found = true;
-        break;
+        found = true; break;
       }
     }
     if (!found) { hover_label.style.display = "none"; canvas.style.cursor = "default"; }
@@ -386,23 +471,27 @@ function setupMouseInteraction() {
   canvas.addEventListener("click", function(e) {
     if (cam_lerping) return;
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     for (let i = 0; i < PLANET_DATA.length; i++) {
       const sp = worldToScreen(planet_positions[i].x, 0, planet_positions[i].z);
       if (!sp) continue;
       const dx = mx - sp.x, dy = my - sp.y;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      const screenR = Math.max(PLANET_DATA[i].sz * canvas.height * 0.4, 16);
-      if (dist < screenR) { flyToPlanet(i, true); break; }
+      if (Math.sqrt(dx*dx+dy*dy) < Math.max(PLANET_DATA[i].sz * canvas.height * 0.4, 16)) {
+        // In solar view, fly to planet. In system/orrery, just update card + ring
+        if (view_mode === 'solar') {
+          selectPlanet(i, true);
+        } else {
+          selectPlanet(i, false);
+        }
+        break;
+      }
     }
   });
 }
 
 function worldToScreen(wx, wy, wz) {
   if (!_last_VP || !_last_P) return null;
-  let pos = vec4(wx, wy, wz, 1.0);
-  let clip = mult(_last_P, mult(_last_VP, pos));
+  let clip = mult(_last_P, mult(_last_VP, vec4(wx, wy, wz, 1.0)));
   if (clip[3] <= 0) return null;
   return {
     x: (clip[0]/clip[3] * 0.5 + 0.5) * canvas.width,
@@ -417,7 +506,7 @@ function draw() {
   webgl_context.clear(webgl_context.DEPTH_BUFFER_BIT | webgl_context.COLOR_BUFFER_BIT);
 
   let eye = vec3(xt, yt, zt);
-  let Vm = lookAt(eye, vec3(0, 0, 0), up);
+  let Vm = lookAt(eye, vec3(0,0,0), up);
   let P  = perspective(fov, canvas.width / canvas.height, 0.01, 200.0);
   _last_VP = Vm; _last_P = P;
 
@@ -426,22 +515,17 @@ function draw() {
   webgl_context.uniform3f(uniform_eye, xt, yt, zt);
   webgl_context.uniform4fv(uniform_light, vec4(lxt, lyt, lzt, 0.0));
 
-  // Skybox
   stars_rot = (stars_rot + 0.003) % 360;
   drawSphere(0, 0, 0, 50.0, radians(stars_rot), 0, 0, 1.0);
 
-  // Orbital rings
   for (let i = 0; i < PLANET_DATA.length; i++) {
-    const isSelected = i === selected_planet;
-    drawRing(PLANET_DATA[i].r, isSelected ? 0.7 : 0.2, isSelected);
+    drawRing(PLANET_DATA[i].r, i === selected_planet ? 0.75 : 0.25, i === selected_planet);
   }
   restoreSphereBuffer();
 
-  // Sun
   sun_rot = (sun_rot + 0.3) % 360;
   drawSphere(0, 0, 0, 0.35, radians(sun_rot), 1, 0, 1.0);
 
-  // Get real or simulated positions
   let real_pos = null;
   if (use_real_positions && typeof getRealPlanetPositions === "function") {
     real_pos = getRealPlanetPositions(sim_date);
@@ -453,45 +537,44 @@ function draw() {
   for (let i = 0; i < PLANET_DATA.length; i++) {
     const p = PLANET_DATA[i];
     p.rot = (p.rot + 1.5) % 360;
-
     let px, pz;
     if (real_pos) {
-      px = real_pos[i].x;
-      pz = real_pos[i].z;
-      planet_positions[i] = { x:px, z:pz };
+      px = real_pos[i].x; pz = real_pos[i].z;
     } else {
       planet_angles[i] = (planet_angles[i] + base_speed * p.spd) % 360;
       const theta = radians(planet_angles[i]);
-      px = p.r * Math.cos(theta);
-      pz = p.r * Math.sin(theta);
-      planet_positions[i] = { x:px, z:pz };
+      px = p.r * Math.cos(theta); pz = p.r * Math.sin(theta);
     }
-
+    planet_positions[i] = { x:px, z:pz };
     if (p.name === "Earth") {
       earth_x = px; earth_z = pz;
       document.getElementById("live-angle").textContent = Math.atan2(pz, px).toFixed(2) + " rad";
       document.getElementById("live-x").textContent = px.toFixed(2);
       document.getElementById("live-z").textContent = pz.toFixed(2);
     }
-
     drawSphere(px, 0, pz, p.sz, radians(p.rot), p.tex, p.shade, 1.0);
-    if (p.name === "Venus") drawSphere(px, 0, pz, p.sz * 1.05, radians(p.rot * 0.7), 4, 0, 0.35);
+    if (p.name === "Venus") drawSphere(px, 0, pz, p.sz*1.05, radians(p.rot*0.7), 4, 0, 0.35);
   }
 
-  // Moon
   moon_angle = (moon_angle + base_speed * MOON.spd) % 360;
   MOON.rot = (MOON.rot + 3) % 360;
   const mt = radians(moon_angle);
-  drawSphere(earth_x + MOON.orbit_r * Math.cos(mt), 0, earth_z + MOON.orbit_r * Math.sin(mt), MOON.sz, radians(MOON.rot), 11, 1, 1.0);
+  drawSphere(earth_x + MOON.orbit_r*Math.cos(mt), 0, earth_z + MOON.orbit_r*Math.sin(mt), MOON.sz, radians(MOON.rot), 11, 1, 1.0);
 }
 
-function setView(mode) {
+function setView(mode, animate = true) {
   view_mode = mode;
   const v = VIEWS[mode];
-  flyToPosition(v.x, v.y, v.z, 2500);
   fov = v.fov;
-  document.getElementById("btn-solar").classList.toggle("active", mode === "solar");
-  document.getElementById("btn-orrery").classList.toggle("active", mode === "orrery");
+  if (animate) {
+    flyToPosition(v.x, v.y, v.z, 2000);
+  } else {
+    xt = v.x; yt = v.y; zt = v.z;
+  }
+  ['solar','system','orrery'].forEach(m => {
+    const btn = document.getElementById('btn-' + m);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
 }
 
 function startGrandTour() {
@@ -503,10 +586,8 @@ function startGrandTour() {
 }
 
 function tourNext() {
-  if (!grand_tour_active || grand_tour_index >= PLANET_DATA.length) {
-    stopGrandTour(); return;
-  }
-  flyToPlanet(grand_tour_index, true);
+  if (!grand_tour_active || grand_tour_index >= PLANET_DATA.length) { stopGrandTour(); return; }
+  selectPlanet(grand_tour_index, true);
   grand_tour_index++;
   grand_tour_timer = setTimeout(tourNext, 4500);
 }
@@ -518,7 +599,8 @@ function stopGrandTour() {
 }
 
 document.getElementById("reset_cl").addEventListener("click", function() {
-  xt = VIEWS.solar.x; yt = VIEWS.solar.y; zt = VIEWS.solar.z; fov = VIEWS.solar.fov;
+  const v = VIEWS[view_mode];
+  xt = v.x; yt = v.y; zt = v.z; fov = v.fov;
 });
 document.getElementById("reset_ss").addEventListener("click", function() {
   orbit_speed_crd = 1.0;
