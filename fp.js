@@ -3,8 +3,6 @@ console.clear();
 let webgl_context = null;
 let program = null;
 let canvas = null;
-let overlay_canvas = null;
-let overlay_ctx = null;
 let attr_vertex = null;
 let attr_normal = null;
 let attr_texCoord = null;
@@ -112,11 +110,6 @@ function configure() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 
-  overlay_canvas = document.getElementById("ring-overlay");
-  overlay_canvas.width = window.innerWidth;
-  overlay_canvas.height = window.innerHeight;
-  overlay_ctx = overlay_canvas.getContext("2d");
-
   webgl_context = canvas.getContext("webgl");
   program = initShaders(webgl_context, "vertex-shader", "fragment-shader");
   webgl_context.useProgram(program);
@@ -159,67 +152,50 @@ function configure() {
 // ============================================================
 // 2D Overlay Ring Drawing with Glow
 // ============================================================
-function drawOverlayRings() {
-  if (!overlay_ctx || !_last_VP || !_last_P) return;
-  overlay_ctx.clearRect(0, 0, overlay_canvas.width, overlay_canvas.height);
-
-  const STEPS = 64;
-
-  for (let i = 0; i < PLANET_DATA.length; i++) {
-    const p = PLANET_DATA[i];
-    const isSelected = i === selected_planet;
-    const color = p.color;
-
-    // Sample 64 points around the 3D orbit ring and project each to screen
-    const points = [];
-    for (let j = 0; j <= STEPS; j++) {
-      const angle = (j / STEPS) * Math.PI * 2;
-      const wx = p.r * Math.cos(angle);
-      const wz = p.r * Math.sin(angle);
-      const sp = worldToScreen(wx, 0, wz);
-      if (sp) points.push(sp);
-    }
-
-    if (points.length < 3) continue;
-
-    if (isSelected) {
-      // Two passes — outer glow then crisp line
-      for (const pass of [
-        { width: 4, alpha: 0.25, blur: 14 },
-        { width: 1.2, alpha: 0.9, blur: 6 },
-      ]) {
-        overlay_ctx.save();
-        overlay_ctx.beginPath();
-        overlay_ctx.moveTo(points[0].x, points[0].y);
-        for (let k = 1; k < points.length; k++) {
-          overlay_ctx.lineTo(points[k].x, points[k].y);
-        }
-        overlay_ctx.closePath();
-        overlay_ctx.strokeStyle = color;
-        overlay_ctx.lineWidth = pass.width;
-        overlay_ctx.globalAlpha = pass.alpha;
-        overlay_ctx.shadowColor = color;
-        overlay_ctx.shadowBlur = pass.blur;
-        overlay_ctx.stroke();
-        overlay_ctx.restore();
-      }
-    } else {
-      overlay_ctx.save();
-      overlay_ctx.beginPath();
-      overlay_ctx.moveTo(points[0].x, points[0].y);
-      for (let k = 1; k < points.length; k++) {
-        overlay_ctx.lineTo(points[k].x, points[k].y);
-      }
-      overlay_ctx.closePath();
-      overlay_ctx.strokeStyle = '#2a4a7a';
-      overlay_ctx.lineWidth = 0.6;
-      overlay_ctx.globalAlpha = 0.4;
-      overlay_ctx.shadowBlur = 0;
-      overlay_ctx.stroke();
-      overlay_ctx.restore();
-    }
+function buildRingBuffer() {
+  // Build a ribbon quad strip for each ring
+  // Each segment has 2 verts (inner + outer), connected as triangles
+  const STEPS = 128;
+  let verts = [];
+  for (let i = 0; i <= STEPS; i++) {
+    const angle = (i / STEPS) * Math.PI * 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    // inner vertex (slightly inside radius, will be scaled by uniform)
+    verts.push(cos * 0.97, 0.0, sin * 0.97);
+    // outer vertex (slightly outside radius)
+    verts.push(cos * 1.03, 0.0, sin * 1.03);
   }
-  overlay_ctx.globalAlpha = 1.0;
+  ring_buffer = webgl_context.createBuffer();
+  webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
+  webgl_context.bufferData(webgl_context.ARRAY_BUFFER, new Float32Array(verts), webgl_context.STATIC_DRAW);
+}
+
+const RING_VERTS = 130; // (STEPS + 1) * 2
+
+function drawRing(radius, selected) {
+  webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
+  webgl_context.vertexAttribPointer(attr_vertex, 3, webgl_context.FLOAT, false, 0, 0);
+  webgl_context.uniform1i(uniform_shading_enabled, 0);
+  webgl_context.uniform4f(uniform_trans, 0.0, 0.0, 0.0, 1.0);
+
+  if (selected) {
+    // Three passes: wide soft glow, medium, crisp bright
+    const passes = [
+      { scale: radius * 1.06, alpha: 0.06 },
+      { scale: radius * 1.025, alpha: 0.18 },
+      { scale: radius,         alpha: 0.85 },
+    ];
+    for (const pass of passes) {
+      webgl_context.uniform1f(uniform_alpha, pass.alpha);
+      webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, pass.scale);
+      webgl_context.drawArrays(webgl_context.TRIANGLE_STRIP, 0, RING_VERTS);
+    }
+  } else {
+    webgl_context.uniform1f(uniform_alpha, 0.18);
+    webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, radius);
+    webgl_context.drawArrays(webgl_context.TRIANGLE_STRIP, 0, RING_VERTS);
+  }
 }
 // ============================================================
 // Vertex/Normal/TexCoord data
@@ -605,6 +581,9 @@ function draw() {
       document.getElementById("live-z").textContent = pz.toFixed(2);
     }
 
+    drawRing(PLANET_DATA[i].r, i === selected_planet);
+    restoreSphereBuffer();
+
     drawSphere(px, 0, pz, p.sz, radians(p.rot), p.tex, p.shade, 1.0);
     if (p.name === "Venus") drawSphere(px, 0, pz, p.sz*1.05, radians(p.rot*0.7), 4, 0, 0.35);
   }
@@ -615,8 +594,6 @@ function draw() {
   const mt = radians(moon_angle);
   drawSphere(earth_x + MOON.orbit_r*Math.cos(mt), 0, earth_z + MOON.orbit_r*Math.sin(mt), MOON.sz, radians(MOON.rot), 11, 1, 1.0);
 
-  // Draw 2D overlay rings with glow
-  drawOverlayRings();
 }
 
 // ============================================================
