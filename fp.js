@@ -35,6 +35,7 @@ let lerp_to = null;
 let lerp_duration = 2000;
 let cam_lerping = false;
 let cam_lerp_done_cb = null;
+let tracking_active = false;
 
 const lxt = 0.0, lyt = 0.0, lzt = 0.0;
 const up = vec3(0.0, 1.0, 0.0);
@@ -364,7 +365,10 @@ function flyToPlanetSolar(index) {
   const tz = pos.z + offset;
   fov = 60;
   setView('solar', false);
-  flyToPosition(tx, ty, tz, 2000);
+  tracking_active = false; // pause tracking during lerp
+  flyToPosition(tx, ty, tz, 2000, () => {
+    tracking_active = true; // kick in after lerp lands
+  });
 }
 
 function updatePlanetSymbols(index) {
@@ -550,6 +554,16 @@ function draw() {
   tickLerp();
   tickSimDate();
 
+      // Planet tracking - follows selected planet in solar view
+  if (view_mode === 'solar' && tracking_active && !cam_lerping) {
+    const pos = planet_positions[selected_planet];
+    const p = PLANET_DATA[selected_planet];
+    const offset = Math.max(p.sz * 2.5, 0.15);
+    xt += (pos.x - xt) * 0.05;
+    zt += (pos.z + offset - zt) * 0.05;
+    yt += (0.06 - yt) * 0.05;
+  }
+
   webgl_context.clear(webgl_context.DEPTH_BUFFER_BIT | webgl_context.COLOR_BUFFER_BIT);
 
   let eye = vec3(xt, yt, zt);
@@ -618,6 +632,7 @@ function draw() {
 // ============================================================
 function setView(mode, animate = true) {
   view_mode = mode;
+  tracking_active = false; // stop tracking on any view change
   const v = VIEWS[mode];
   fov = v.fov;
   if (animate) flyToPosition(v.x, v.y, v.z, 2000);
