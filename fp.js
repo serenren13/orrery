@@ -3,6 +3,8 @@ console.clear();
 let webgl_context = null;
 let program = null;
 let canvas = null;
+let overlay_canvas = null;
+let overlay_ctx = null;
 let attr_vertex = null;
 let attr_normal = null;
 let attr_texCoord = null;
@@ -39,9 +41,9 @@ const lxt = 0.0, lyt = 0.0, lzt = 0.0;
 const up = vec3(0.0, 1.0, 0.0);
 
 // View mode: "solar" | "system" | "orrery"
-let view_mode = "solar";
+let view_mode = "system";
 
-// Selected planet index
+// Selected planet index (Earth default)
 let selected_planet = 2;
 
 // Grand tour
@@ -49,14 +51,13 @@ let grand_tour_active = false;
 let grand_tour_index = 0;
 let grand_tour_timer = null;
 
-// Time mode: "simulated" | "live"
+// Time mode
 let time_mode = "simulated";
 let sim_date = new Date();
 let last_frame_time = performance.now();
 let use_real_positions = false;
 let orbit_speed_crd = 1.0;
 
-// Scrubber: 0=1900, 100=2100
 const SCRUBBER_START_YEAR = 1900;
 const SCRUBBER_END_YEAR = 2100;
 
@@ -103,13 +104,18 @@ let url_map = new Map([
   ["moon",          "2k_moon.jpg"],
 ]);
 
-let ring_buffer = null;
-const RING_SEGMENTS = 128;
-
+// ============================================================
+// Configure WebGL
+// ============================================================
 function configure() {
   canvas = document.getElementById("webgl-canvas");
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+
+  overlay_canvas = document.getElementById("ring-overlay");
+  overlay_canvas.width = window.innerWidth;
+  overlay_canvas.height = window.innerHeight;
+  overlay_ctx = overlay_canvas.getContext("2d");
 
   webgl_context = canvas.getContext("webgl");
   program = initShaders(webgl_context, "vertex-shader", "fragment-shader");
@@ -134,10 +140,15 @@ function configure() {
   webgl_context.enable(webgl_context.BLEND);
   webgl_context.blendFunc(webgl_context.SRC_ALPHA, webgl_context.ONE_MINUS_SRC_ALPHA);
 
-  buildRingBuffer();
   setupMouseInteraction();
   setupPlanetSymbols();
   setupDateScrubber();
+
+  // Pre-compute initial planet positions so camera flies correctly on load
+  for (let i = 0; i < PLANET_DATA.length; i++) {
+    planet_positions[i] = { x: PLANET_DATA[i].r, z: 0 };
+  }
+
   updateInfoCard(2);
   updatePlanetSymbols(2);
 
@@ -145,44 +156,83 @@ function configure() {
   xt = v.x; yt = v.y; zt = v.z; fov = v.fov;
 }
 
-function buildRingBuffer() {
-  let points = [];
-  for (let i = 0; i <= RING_SEGMENTS; i++) {
-    const a = (i / RING_SEGMENTS) * 2 * Math.PI;
-    points.push(Math.cos(a), 0.0, Math.sin(a));
-  }
-  ring_buffer = webgl_context.createBuffer();
-  webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
-  webgl_context.bufferData(webgl_context.ARRAY_BUFFER, new Float32Array(points), webgl_context.STATIC_DRAW);
-}
+// ============================================================
+// 2D Overlay Ring Drawing with Glow
+// ============================================================
+function drawOverlayRings() {
+  if (!overlay_ctx || !_last_VP || !_last_P) return;
 
-function drawRing(radius, alpha, selected) {
-  webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
-  webgl_context.vertexAttribPointer(attr_vertex, 3, webgl_context.FLOAT, false, 0, 0);
-  webgl_context.uniform1i(uniform_shading_enabled, 0);
-  webgl_context.uniform4f(uniform_trans, 0.0, 0.0, 0.0, 1.0);
-  if (selected) {
-    for (let pass = 3; pass >= 0; pass--) {
-      webgl_context.uniform1f(uniform_alpha, alpha * (1 - pass * 0.22));
-      webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, radius + pass * 0.005);
-      webgl_context.drawArrays(webgl_context.LINE_STRIP, 0, RING_SEGMENTS + 1);
+  overlay_ctx.clearRect(0, 0, overlay_canvas.width, overlay_canvas.height);
+
+  const fov_rad = fov * Math.PI / 180;
+  const half_h = overlay_canvas.height / 2;
+  const focal = half_h / Math.tan(fov_rad / 2);
+
+  for (let i = 0; i < PLANET_DATA.length; i++) {
+    const p = PLANET_DATA[i];
+    const isSelected = i === selected_planet;
+    const color = p.color;
+
+    // Project center (sun at origin) to screen
+    const center = worldToScreen(0, 0, 0);
+    if (!center) continue;
+
+    // Project a point on the ring edge to get screen radius
+    const edge = worldToScreen(p.r, 0, 0);
+    if (!edge) continue;
+
+    const dx = edge.x - center.x;
+    const dy = edge.y - center.y;
+    const screenRadius = Math.sqrt(dx*dx + dy*dy);
+    if (screenRadius < 1) continue;
+
+    // Determine ellipse Y scale based on camera elevation
+    // The ring is flat (y=0 plane), so we need the projected Y compression
+    const top = worldToScreen(0, 0, p.r);
+    if (!top) continue;
+    const topDy = Math.abs(top.y - center.y);
+    const radiusY = topDy;
+
+    overlay_ctx.save();
+    overlay_ctx.translate(center.x, center.y);
+
+    if (isSelected) {
+      // Glowing selected ring — multiple passes
+      const glowPasses = [
+        { width: 6, alpha: 0.08 },
+        { width: 3, alpha: 0.15 },
+        { width: 1.5, alpha: 0.5 },
+        { width: 0.8, alpha: 0.9 },
+      ];
+      for (const pass of glowPasses) {
+        overlay_ctx.beginPath();
+        overlay_ctx.ellipse(0, 0, screenRadius, Math.max(radiusY, 1), 0, 0, Math.PI * 2);
+        overlay_ctx.strokeStyle = color;
+        overlay_ctx.lineWidth = pass.width;
+        overlay_ctx.globalAlpha = pass.alpha;
+        overlay_ctx.shadowColor = color;
+        overlay_ctx.shadowBlur = isSelected ? 12 : 0;
+        overlay_ctx.stroke();
+      }
+    } else {
+      // Dim unselected ring
+      overlay_ctx.beginPath();
+      overlay_ctx.ellipse(0, 0, screenRadius, Math.max(radiusY, 1), 0, 0, Math.PI * 2);
+      overlay_ctx.strokeStyle = "#4a6a9a";
+      overlay_ctx.lineWidth = 0.6;
+      overlay_ctx.globalAlpha = 0.35;
+      overlay_ctx.shadowBlur = 0;
+      overlay_ctx.stroke();
     }
-  } else {
-    webgl_context.uniform1f(uniform_alpha, alpha);
-    webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, radius);
-    webgl_context.drawArrays(webgl_context.LINE_STRIP, 0, RING_SEGMENTS + 1);
+
+    overlay_ctx.restore();
   }
+  overlay_ctx.globalAlpha = 1.0;
 }
 
-function restoreSphereBuffer() {
-  webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, window._vertex_buffer);
-  webgl_context.vertexAttribPointer(attr_vertex, size, webgl_context.FLOAT, false, 0, 0);
-  webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, window._normal_buffer);
-  webgl_context.vertexAttribPointer(attr_normal, size, webgl_context.FLOAT, false, 0, 0);
-  webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, window._texCoord_buffer);
-  webgl_context.vertexAttribPointer(attr_texCoord, 2, webgl_context.FLOAT, false, 0, 0);
-}
-
+// ============================================================
+// Vertex/Normal/TexCoord data
+// ============================================================
 function createVertexData() {
   vertex_data = [];
   for (let i = 0; i < F.length; i++) {
@@ -250,6 +300,15 @@ function allocateMemory() {
   webgl_context.enableVertexAttribArray(attr_texCoord);
 }
 
+function restoreSphereBuffer() {
+  webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, window._vertex_buffer);
+  webgl_context.vertexAttribPointer(attr_vertex, size, webgl_context.FLOAT, false, 0, 0);
+  webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, window._normal_buffer);
+  webgl_context.vertexAttribPointer(attr_normal, size, webgl_context.FLOAT, false, 0, 0);
+  webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, window._texCoord_buffer);
+  webgl_context.vertexAttribPointer(attr_texCoord, 2, webgl_context.FLOAT, false, 0, 0);
+}
+
 function bindTexture(index, unit) {
   webgl_context.activeTexture(webgl_context.TEXTURE0 + unit);
   webgl_context.bindTexture(webgl_context.TEXTURE_2D, textures[index]);
@@ -266,6 +325,9 @@ function drawSphere(tx, ty, tz, scale, rotY, texIndex, shading, alpha) {
   webgl_context.drawArrays(webgl_context.TRIANGLES, 0, vertex_data.length);
 }
 
+// ============================================================
+// Camera lerp with ease-in-out cubic
+// ============================================================
 function easeInOut(t) {
   return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
 }
@@ -296,23 +358,26 @@ function tickLerp() {
   }
 }
 
-// selectPlanet — the central function that links symbol + ring + card
+// ============================================================
+// Planet selection — central function linking symbol + ring + card
+// ============================================================
 function selectPlanet(index, flyTo) {
   selected_planet = index;
   updateInfoCard(index);
   updatePlanetSymbols(index);
   pulseInfoCard(index);
-  if (flyTo) {
-    flyToPlanetSolar(index);
-  }
+  if (flyTo) flyToPlanetSolar(index);
 }
 
-function flyToPlanetSolar_OLD(index) {
+function flyToPlanetSolar(index) {
   const p = PLANET_DATA[index];
   const pos = planet_positions[index];
-  const tx = pos.x * 0.9;
-  const ty = VIEWS.solar.y;
-  const tz = pos.z + p.sz * 4 + 0.15;
+  // Fixed offset behind the planet proportional to its size, capped so we never go inside it
+  const offset = Math.max(p.sz * 2.5, 0.15);
+  const tx = pos.x;
+  const ty = 0.06;
+  const tz = pos.z + offset;
+  fov = 60;
   setView('solar', false);
   flyToPosition(tx, ty, tz, 2000);
 }
@@ -327,11 +392,7 @@ function pulseInfoCard(index) {
   const card = document.getElementById('info-card');
   const color = PLANET_DATA[index].color;
   card.style.borderColor = color;
-  card.style.transition = 'border-color 0.1s ease';
-  setTimeout(() => {
-    card.style.borderColor = '';
-    card.style.transition = 'border-color 0.8s ease';
-  }, 300);
+  setTimeout(() => { card.style.borderColor = ''; }, 400);
 }
 
 function updateInfoCard(index) {
@@ -347,21 +408,23 @@ function updateInfoCard(index) {
   document.getElementById("live-section").style.display = p.name === "Earth" ? "block" : "none";
 }
 
-// Planet symbol bar setup
+// ============================================================
+// Planet symbol bar
+// ============================================================
 function setupPlanetSymbols() {
   document.querySelectorAll('.planet-sym').forEach(el => {
     el.addEventListener('click', function() {
-      const index = parseInt(this.dataset.index);
-      selectPlanet(index, true); // always fly in solar view
+      selectPlanet(parseInt(this.dataset.index), true);
     });
   });
 }
 
+// ============================================================
 // Date scrubber
+// ============================================================
 function setupDateScrubber() {
   const scrubber = document.getElementById('date-scrubber');
   if (!scrubber) return;
-  // Set initial value to today
   const today = new Date();
   const totalYears = SCRUBBER_END_YEAR - SCRUBBER_START_YEAR;
   const currentYears = today.getFullYear() - SCRUBBER_START_YEAR + (today.getMonth() / 12);
@@ -371,13 +434,9 @@ function setupDateScrubber() {
     if (time_mode !== 'simulated') return;
     const pct = parseFloat(this.value) / 100;
     const year = SCRUBBER_START_YEAR + pct * (SCRUBBER_END_YEAR - SCRUBBER_START_YEAR);
-    const fullYear = Math.floor(year);
-    const month = Math.floor((year - fullYear) * 12);
-    sim_date = new Date(Date.UTC(fullYear, month, 1));
+    sim_date = new Date(Date.UTC(Math.floor(year), Math.floor((year % 1) * 12), 1));
+    use_real_positions = true;
     updateSimDateDisplay();
-    if (typeof getRealPlanetPositions === "function") {
-      use_real_positions = true;
-    }
   });
 }
 
@@ -393,7 +452,9 @@ function snapToToday() {
   }
 }
 
+// ============================================================
 // Time mode
+// ============================================================
 function setTimeMode(mode) {
   time_mode = mode;
   const simBtn = document.getElementById('btn-simulated');
@@ -436,12 +497,13 @@ function tickSimDate() {
   const real_ms = now - last_frame_time;
   last_frame_time = now;
   const days_per_real_second = 10 * orbit_speed_crd;
-  const days_delta = (real_ms / 1000) * days_per_real_second;
-  sim_date = new Date(sim_date.getTime() + days_delta * 86400000);
+  sim_date = new Date(sim_date.getTime() + (real_ms / 1000) * days_per_real_second * 86400000);
   updateSimDateDisplay();
 }
 
+// ============================================================
 // Mouse interaction
+// ============================================================
 let hover_label = null;
 let _last_VP = null, _last_P = null;
 
@@ -457,7 +519,7 @@ function setupMouseInteraction() {
       const sp = worldToScreen(planet_positions[i].x, 0, planet_positions[i].z);
       if (!sp) continue;
       const dx = mx - sp.x, dy = my - sp.y;
-      if (Math.sqrt(dx*dx+dy*dy) < Math.max(PLANET_DATA[i].sz * canvas.height * 0.4, 16)) {
+      if (Math.sqrt(dx*dx+dy*dy) < Math.max(PLANET_DATA[i].sz * canvas.height * 0.4, 18)) {
         hover_label.style.display = "block";
         hover_label.style.left = (sp.x + 14) + "px";
         hover_label.style.top  = (sp.y - 8) + "px";
@@ -477,13 +539,9 @@ function setupMouseInteraction() {
       const sp = worldToScreen(planet_positions[i].x, 0, planet_positions[i].z);
       if (!sp) continue;
       const dx = mx - sp.x, dy = my - sp.y;
-      if (Math.sqrt(dx*dx+dy*dy) < Math.max(PLANET_DATA[i].sz * canvas.height * 0.4, 16)) {
-        // In solar view, fly to planet. In system/orrery, just update card + ring
-        if (view_mode === 'solar') {
-          selectPlanet(i, true);
-        } else {
-          selectPlanet(i, false);
-        }
+      if (Math.sqrt(dx*dx+dy*dy) < Math.max(PLANET_DATA[i].sz * canvas.height * 0.4, 18)) {
+        if (view_mode === 'solar') selectPlanet(i, true);
+        else selectPlanet(i, false);
         break;
       }
     }
@@ -500,6 +558,9 @@ function worldToScreen(wx, wy, wz) {
   };
 }
 
+// ============================================================
+// Main draw loop
+// ============================================================
 function draw() {
   tickLerp();
   tickSimDate();
@@ -516,17 +577,15 @@ function draw() {
   webgl_context.uniform3f(uniform_eye, xt, yt, zt);
   webgl_context.uniform4fv(uniform_light, vec4(lxt, lyt, lzt, 0.0));
 
+  // Skybox
   stars_rot = (stars_rot + 0.003) % 360;
   drawSphere(0, 0, 0, 50.0, radians(stars_rot), 0, 0, 1.0);
 
-  for (let i = 0; i < PLANET_DATA.length; i++) {
-    drawRing(PLANET_DATA[i].r, i === selected_planet ? 0.75 : 0.25, i === selected_planet);
-  }
-  restoreSphereBuffer();
-
+  // Sun
   sun_rot = (sun_rot + 0.3) % 360;
   drawSphere(0, 0, 0, 0.35, radians(sun_rot), 1, 0, 1.0);
 
+  // Planets
   let real_pos = null;
   if (use_real_positions && typeof getRealPlanetPositions === "function") {
     real_pos = getRealPlanetPositions(sim_date);
@@ -547,37 +606,46 @@ function draw() {
       px = p.r * Math.cos(theta); pz = p.r * Math.sin(theta);
     }
     planet_positions[i] = { x:px, z:pz };
+
     if (p.name === "Earth") {
       earth_x = px; earth_z = pz;
       document.getElementById("live-angle").textContent = Math.atan2(pz, px).toFixed(2) + " rad";
       document.getElementById("live-x").textContent = px.toFixed(2);
       document.getElementById("live-z").textContent = pz.toFixed(2);
     }
+
     drawSphere(px, 0, pz, p.sz, radians(p.rot), p.tex, p.shade, 1.0);
     if (p.name === "Venus") drawSphere(px, 0, pz, p.sz*1.05, radians(p.rot*0.7), 4, 0, 0.35);
   }
 
+  // Moon
   moon_angle = (moon_angle + base_speed * MOON.spd) % 360;
   MOON.rot = (MOON.rot + 3) % 360;
   const mt = radians(moon_angle);
   drawSphere(earth_x + MOON.orbit_r*Math.cos(mt), 0, earth_z + MOON.orbit_r*Math.sin(mt), MOON.sz, radians(MOON.rot), 11, 1, 1.0);
+
+  // Draw 2D overlay rings with glow
+  drawOverlayRings();
 }
 
+// ============================================================
+// View toggle
+// ============================================================
 function setView(mode, animate = true) {
   view_mode = mode;
   const v = VIEWS[mode];
   fov = v.fov;
-  if (animate) {
-    flyToPosition(v.x, v.y, v.z, 2000);
-  } else {
-    xt = v.x; yt = v.y; zt = v.z;
-  }
+  if (animate) flyToPosition(v.x, v.y, v.z, 2000);
+  else { xt = v.x; yt = v.y; zt = v.z; }
   ['solar','system','orrery'].forEach(m => {
     const btn = document.getElementById('btn-' + m);
     if (btn) btn.classList.toggle('active', m === mode);
   });
 }
 
+// ============================================================
+// Grand Tour
+// ============================================================
 function startGrandTour() {
   if (grand_tour_active) { stopGrandTour(); return; }
   grand_tour_active = true;
@@ -599,6 +667,9 @@ function stopGrandTour() {
   document.getElementById("btn-tour").classList.remove("active");
 }
 
+// ============================================================
+// Reset buttons
+// ============================================================
 document.getElementById("reset_cl").addEventListener("click", function() {
   const v = VIEWS[view_mode];
   xt = v.x; yt = v.y; zt = v.z; fov = v.fov;
@@ -609,6 +680,9 @@ document.getElementById("reset_ss").addEventListener("click", function() {
   document.getElementById("os_crd").textContent = "1.0x";
 });
 
+// ============================================================
+// Init
+// ============================================================
 createVertexData();
 createNormalData();
 createTexCoordData();
@@ -616,16 +690,3 @@ configure();
 loadTextures();
 allocateMemory();
 setInterval(draw, 33);
-
-function flyToPlanetSolar(index) {
-  const p = PLANET_DATA[index];
-  const pos = planet_positions[index];
-  const dist = Math.max(p.sz * 3.5, 0.18);
-  const angle = Math.atan2(pos.z, pos.x);
-  const tx = pos.x - Math.cos(angle) * dist * 0.3;
-  const ty = p.sz * 1.2 + 0.05;
-  const tz = pos.z + dist;
-  fov = 60;
-  setView('solar', false);
-  flyToPosition(tx, ty, tz, 2000);
-}

@@ -307,3 +307,11 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 10px; color: #2a4a7a;
   letter-spacing: 0.14em; margin-bottom: 8px;
 }
+
+#ring-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  pointer-events: none;
+  z-index: 1;
+}
