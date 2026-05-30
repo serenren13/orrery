@@ -614,4 +614,9 @@ createTexCoordData();
 configure();
 loadTextures();
 allocateMemory();
+// Pre-compute initial planet positions
+for (let i = 0; i < PLANET_DATA.length; i++) {
+  const p = PLANET_DATA[i];
+  planet_positions[i] = { x: p.r, z: 0 };
+}
 setInterval(draw, 33);
