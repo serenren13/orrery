@@ -498,7 +498,7 @@ function draw() {
   sun_rot = (sun_rot + 0.3) % 360;
   drawSphere(0, 0, 0, 0.35, radians(sun_rot), 1, 0, 1.0);
 
-  const base_speed = 0.4;
+  let base_speed = 0.4 * orbit_speed_crd;
   let earth_x = 0, earth_z = 0;
 
   for (let i = 0; i < PLANET_DATA.length; i++) {
