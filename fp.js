@@ -7,6 +7,7 @@ let attr_vertex = null;
 let attr_normal = null;
 let attr_texCoord = null;
 let uniform_color = null;
+let uniform_solid_color = null;
 let uniform_view = null;
 let uniform_props = null;
 let uniform_perspective = null;
@@ -131,6 +132,7 @@ function configure() {
   uniform_textureSampler  = webgl_context.getUniformLocation(program, "textureSampler");
   uniform_shading_enabled = webgl_context.getUniformLocation(program, "shading_enabled");
   uniform_alpha           = webgl_context.getUniformLocation(program, "u_alpha");
+  uniform_solid_color     = webgl_context.getUniformLocation(program, "use_solid_color");
 
   webgl_context.enable(webgl_context.DEPTH_TEST);
   webgl_context.enable(webgl_context.BLEND);
@@ -183,6 +185,7 @@ function hexToRgb(hex) {
 }
 
 function drawRing(radius, selected) {
+  webgl_context.uniform1i(uniform_solid_color, 1);
   webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
   webgl_context.vertexAttribPointer(attr_vertex, 3, webgl_context.FLOAT, false, 0, 0);
   webgl_context.uniform1i(uniform_shading_enabled, 0);
@@ -281,6 +284,7 @@ function allocateMemory() {
 }
 
 function restoreSphereBuffer() {
+  webgl_context.uniform1i(uniform_solid_color, 0);
   webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, window._vertex_buffer);
   webgl_context.vertexAttribPointer(attr_vertex, size, webgl_context.FLOAT, false, 0, 0);
   webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, window._normal_buffer);
