@@ -129,31 +129,24 @@
   uniform int shading_enabled;
   varying vec3 N, L, E;
   varying vec2 fTexCoord;
+  uniform float u_alpha;
+
   void main() {
-    vec3 pos = vertex.xyz * props.w;
-    float c = cos(props.y);
-    float s = sin(props.y);
-    mat4 ry = mat4(
-        vec4(c, 0.0, s, 0.0),
-        vec4(0.0, 1.0, 0.0, 0.0),
-        vec4(-s, 0.0, c, 0.0),
-        vec4(0.0, 0.0, 0.0, 1.0)
-    );
-    mat4 translate = mat4(
-        vec4(1.0, 0.0, 0.0, 0.0),
-        vec4(0.0, 1.0, 0.0, 0.0),
-        vec4(0.0, 0.0, 1.0, 0.0),
-        vec4(trans.x, trans.y, trans.z, 1.0)
-    );
-    vec4 position = translate * ry * vec4(pos, 1.0);
-    vec3 v_p = -(P * V * position).xyz;
-    vec3 v_l = light.xyz;
-    vec3 v_n = (ry * normal).xyz;
-    L = normalize(v_l - v_p);
-    E = -eye;
-    N = normalize(v_n);
-    fTexCoord = texCoord;
-    gl_Position = P * V * position;
+    vec4 texColor = texture2D(textureSampler, fTexCoord);
+    if (shading_enabled == 0) {
+      gl_FragColor = vec4(texColor.rgb, texColor.a * u_alpha);
+    } else {
+      vec3 H = normalize(L + E);
+      float diffuseFactor = max(dot(L, N), 0.0);
+      vec4 diffuse = kd * texColor * diffuseFactor;
+      vec4 ambient = ka * texColor;
+      float specularFactor = pow(max(dot(N, H), 0.0), shininess);
+      vec4 specular = vec4(specularFactor, specularFactor, specularFactor, 1.0);
+      if (dot(L, N) < 0.0) {
+        specular = vec4(0.0, 0.0, 0.0, 1.0);
+      }
+      gl_FragColor = vec4((diffuse + ambient + specular).rgb, u_alpha);
+    }
   }
 </script>
 <script id="fragment-shader" type="x-shader/x-fragment">
