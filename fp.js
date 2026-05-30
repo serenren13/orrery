@@ -80,9 +80,9 @@ let sun_rot = 0;
 let stars_rot = 0;
 
 const VIEWS = {
-  solar:  { x:0.0, y:0.08, z:0.55, fov:55 },
-  system: { x:0.0, y:0.6,  z:0.8,  fov:70 },
-  orrery: { x:0.0, y:1.8,  z:0.01, fov:75 },
+  solar:  { x:0.0, y:0.08, z:0.55, fov:60 },
+  system: { x:0.0, y:0.55, z:0.85, fov:65 },
+  orrery: { x:0.0, y:1.8,  z:0.01, fov:72 },
 };
 
 const TEXTURE_KEYS = ["stars","sun","mercury","venus_surface","venus_atmo",
@@ -138,9 +138,10 @@ function configure() {
   setupMouseInteraction();
   setupPlanetSymbols();
   setupDateScrubber();
-  selectPlanet(2, false);
+  updateInfoCard(2);
+  updatePlanetSymbols(2);
 
-  const v = VIEWS.solar;
+  const v = VIEWS.system;
   xt = v.x; yt = v.y; zt = v.z; fov = v.fov;
 }
 
@@ -306,7 +307,7 @@ function selectPlanet(index, flyTo) {
   }
 }
 
-function flyToPlanetSolar(index) {
+function flyToPlanetSolar_OLD(index) {
   const p = PLANET_DATA[index];
   const pos = planet_positions[index];
   const tx = pos.x * 0.9;
@@ -614,9 +615,17 @@ createTexCoordData();
 configure();
 loadTextures();
 allocateMemory();
-// Pre-compute initial planet positions
-for (let i = 0; i < PLANET_DATA.length; i++) {
-  const p = PLANET_DATA[i];
-  planet_positions[i] = { x: p.r, z: 0 };
-}
 setInterval(draw, 33);
+
+function flyToPlanetSolar(index) {
+  const p = PLANET_DATA[index];
+  const pos = planet_positions[index];
+  const dist = Math.max(p.sz * 3.5, 0.18);
+  const angle = Math.atan2(pos.z, pos.x);
+  const tx = pos.x - Math.cos(angle) * dist * 0.3;
+  const ty = p.sz * 1.2 + 0.05;
+  const tz = pos.z + dist;
+  fov = 60;
+  setView('solar', false);
+  flyToPosition(tx, ty, tz, 2000);
+}
