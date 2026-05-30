@@ -169,10 +169,15 @@ function computePlanetPosition(planetName, T) {
 // ============================================================
 function getRealPlanetPositions(date) {
   const T = toJ2000Centuries(date);
-  const scale = 0.28; // AU to scene units
+  
+  // Real semi-major axes in AU for each planet
+  const realAU = [0.387, 0.723, 1.000, 1.524, 5.203, 9.537, 19.19, 30.07];
 
-  return PLANET_NAMES.map(name => {
+  return PLANET_NAMES.map((name, i) => {
     const pos = computePlanetPosition(name, T);
+    // Scale: map real AU distance to sim r value
+    const simR = PLANET_DATA[i].r;
+    const scale = simR / realAU[i];
     return {
       x: pos.x * scale,
       z: pos.y * scale  // ecliptic y becomes our scene z
