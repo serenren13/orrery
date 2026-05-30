@@ -1,0 +1,169 @@
+<html>
+<head>
+    <link rel="stylesheet" href="fp.css">
+    <script src="https://www.cs.unm.edu/~angel/WebGL/7E/Common/initShaders.js" defer></script>
+    <script src="https://www.cs.unm.edu/~angel/WebGL/7E/Common/MV.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/gh/brent-munsell/graphics/models/msphere.js" defer></script>
+    <script src="listeners.js" defer></script>
+    <script src="helpers.js" defer></script>
+    <script src="fp.js" defer></script>
+</head>
+<body>
+    <div id="container">
+        <div class="app">
+            <div class="title">Mini Solar System</div>
+            <div class="setting">
+                <div class="control">
+                  <ul>
+                        <li>Earth settings</li>
+                        <li><span>Orbit speed</span><span id="os_crd">=&nbsp;3</span></li>
+                        <li><input type="range" id="os" min="0" max="10" step="0.1" value="3"></li>
+                        <li><span>Orbit distance</span><span id="od_crd">=&nbsp;1.0</span></li>
+                        <li><input type="range" id="od" min="1.0" max="2.0" step="0.05" value="1.0"></li>
+                        <li><span>Orbit angle</span><span id="oa_crd">=&nbsp;0</span></li>
+                        <li><input type="range" id="oa" min="0" max="45" step="1" value="0"></li>
+                        <li><button id="reset_ss">reset</button></li>
+                  </ul> 
+                  <ul>
+                        <li>Camera settings</li>
+                        <li><span class="red-font">X</span><span id="x_crd">=&nbsp;0.0</span></li>
+                        <li><input type="range" id="xt" min="-1" max="1" step="0.01" value="0.0"></li>
+                        <li><span class="green-font">Y</span><span id="y_crd">=&nbsp;0.0</span></li>
+                        <li><input type="range" id="yt" min="-1" max="1" step="0.01" value="0.0"></li>
+                        <li><span class="blue-font">Z</span><span id="z_crd">=&nbsp;1.0</span></li>
+                        <li><input type="range" id="zt" min="-1" max="1" step="0.01" value="1.0"></li>
+                        <li><span>FoV</span><span id="fovy">=&nbsp;85</span></li>
+                        <li><input type="range" id="fov" min="10" max="100" step="1" value="85"></li>
+                        <li><button id="reset_cl">reset</button></li>
+                  </ul>
+                  
+                </div> <!-- end control -->
+                <div class="rock">
+                    <canvas id="webgl-canvas">
+                        Oops, your browser doesn't support the HTML5 canvas!
+                    </canvas>
+                </div> <!-- end rock -->
+            </div> <!-- end setting -->
+        </div> <!-- end app -->
+    </div> <!-- end containter -->
+</body>  
+<script id="vertex-shader" type="x-shader/x-vertex">
+  
+  precision mediump float;
+  
+  // ---------------------------------
+  // Todo: You complete the code
+  // ---------------------------------
+  attribute vec4 vertex;
+  attribute vec4 normal;
+  attribute vec2 texCoord;
+  
+  uniform mat4 V;
+  uniform mat4 P;
+  uniform vec4 light;
+  uniform vec3 eye;
+  uniform vec4 trans;
+  uniform vec4 props;
+  uniform int shading_enabled;
+  
+  varying vec3 N, L, E;
+  varying vec2 fTexCoord;
+  
+  void main() {
+    // Scale the vertex based on the scaling factor in props.w
+    vec3 pos = vertex.xyz * props.w;
+    
+    // Rotate around y-axis (props.y contains the rotation angle)
+    float c = cos(props.y);
+    float s = sin(props.y);
+    mat4 ry = mat4(
+        vec4(c, 0.0, s, 0.0),
+        vec4(0.0, 1.0, 0.0, 0.0), 
+        vec4(-s, 0.0, c, 0.0),
+        vec4(0.0, 0.0, 0.0, 1.0)
+    );
+    
+    // Translation matrix based on trans vector
+    mat4 translate = mat4(
+        vec4(1.0, 0.0, 0.0, 0.0),
+        vec4(0.0, 1.0, 0.0, 0.0),
+        vec4(0.0, 0.0, 1.0, 0.0),
+        vec4(trans.x, trans.y, trans.z, 1.0)
+    );
+    
+    // Apply transformations to vertex position
+    vec4 position = translate * ry * vec4(pos, 1.0);
+    
+    // Calculate vectors for lighting
+    vec3 v_p = -(P * V * position).xyz;
+    vec3 v_l = light.xyz;
+    vec3 v_n = (ry * normal).xyz;
+    
+    // Setup vectors for fragment shader
+    L = normalize(v_l - v_p);
+    E = -eye;
+    N = normalize(v_n);
+    
+    // Pass texture coordinates to fragment shader
+    fTexCoord = texCoord;
+    
+    // Calculate final position
+    gl_Position = P * V * position;
+  }
+
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+
+    precision mediump float;
+    precision lowp int;
+
+    // ---------------------------------
+    // Todo: You complete the code
+    // ---------------------------------
+    uniform sampler2D textureSampler;
+    uniform int shading_enabled;
+    uniform vec4 color;
+    
+    varying vec3 N, L, E;
+    varying vec2 fTexCoord;
+  
+    float shininess = 800.0; 
+    vec4 kd = vec4( 0.9, 0.9, 0.9, 1.0 );
+    vec4 ka = vec4( 0.2, 0.2, 0.2, 1.0 );
+  
+    void main() {
+      // Get texture color
+      vec4 texColor = texture2D(textureSampler, fTexCoord);
+      
+      // For the Sun (shading_enabled = 0), use texture color directly
+      if (shading_enabled == 0) {
+        gl_FragColor = texColor;
+      }
+      // For Earth and Moon (shading_enabled = 1), apply lighting
+      else {
+        vec3 H = normalize(L + E);
+        
+        // Calculate diffuse component
+        float diffuseFactor = max(dot(L, N), 0.0);
+        vec4 diffuse = kd * texColor * diffuseFactor;
+        
+        // Calculate ambient component
+        vec4 ambient = ka * texColor;
+        
+        // Calculate specular component
+        float specularFactor = pow(max(dot(N, H), 0.0), shininess);
+        vec4 specular = vec4(specularFactor, specularFactor, specularFactor, 1.0);
+        
+        // Disable specular if surface faces away from light
+        if (dot(L, N) < 0.0) {
+          specular = vec4(0.0, 0.0, 0.0, 1.0);
+        }
+        
+        // Combine components for final color
+        gl_FragColor = diffuse + ambient + specular;
+      }
+    }
+  
+</script>
+</html>
