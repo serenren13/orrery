@@ -184,7 +184,7 @@ function hexToRgb(hex) {
   return { r, g, b };
 }
 
-function drawRing(radius, selected) {
+function drawRing(radius, planetIndex, selected) {
   webgl_context.uniform1i(uniform_solid_color, 1);
   webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
   webgl_context.vertexAttribPointer(attr_vertex, 3, webgl_context.FLOAT, false, 0, 0);
