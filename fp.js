@@ -600,7 +600,6 @@ function draw() {
     }
 
     drawRing(PLANET_DATA[i].r, i, i === selected_planet);
-    restoreSphereBuffer();
 
     drawSphere(px, 0, pz, p.sz, radians(p.rot), p.tex, p.shade, 1.0);
     if (p.name === "Venus") drawSphere(px, 0, pz, p.sz*1.05, radians(p.rot*0.7), 4, 0, 0.35);
