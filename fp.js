@@ -225,7 +225,7 @@ function draw() {
   
   let eye = vec3(xt, yt, zt);
   let V = lookAt(eye, at, up);
-  let P = perspective(fov, 1.0, 0.1, 10.0);
+  let P = perspective(fov, canvas.width / canvas.height, 0.1, 10.0);
   
   webgl_context.uniformMatrix4fv(uniform_view, false, flatten(V));
   webgl_context.uniformMatrix4fv(uniform_perspective, false, flatten(P));
