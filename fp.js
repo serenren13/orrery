@@ -91,6 +91,8 @@ function configure() {
   program = initShaders(webgl_context, "vertex-shader", "fragment-shader");
   webgl_context.useProgram(program);
   
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
   webgl_context.viewport(0, 0, canvas.width, canvas.height);
   
   attr_vertex = webgl_context.getAttribLocation(program, "vertex");
@@ -253,6 +255,10 @@ function draw() {
   let earth_x = scale_factor * orbit_radius_crd * Math.sin(theta) * Math.cos(phi);
   let earth_y = scale_factor * orbit_radius_crd * Math.sin(theta) * Math.sin(phi);
   let earth_z = scale_factor * orbit_radius_crd * Math.cos(theta);
+
+  document.getElementById("live-angle").textContent = theta.toFixed(2) + " rad";
+  document.getElementById("live-x").textContent = earth_x.toFixed(2);
+  document.getElementById("live-z").textContent = earth_z.toFixed(2);
   
   earth_rot = (earth_rot + 5) % 360;
   
