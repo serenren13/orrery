@@ -102,6 +102,9 @@ let url_map = new Map([
   ["moon",          "2k_moon.jpg"],
 ]);
 
+let ring_buffer = null;
+const RING_VERTS = 260; // (STEPS + 1) * 2
+
 // ============================================================
 // Configure WebGL
 // ============================================================
@@ -171,8 +174,6 @@ function buildRingBuffer() {
   webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
   webgl_context.bufferData(webgl_context.ARRAY_BUFFER, new Float32Array(verts), webgl_context.STATIC_DRAW);
 }
-
-const RING_VERTS = 130; // (STEPS + 1) * 2
 
 function drawRing(radius, selected) {
   webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
