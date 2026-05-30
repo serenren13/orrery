@@ -236,3 +236,61 @@ input[type="range"]::-webkit-slider-thumb {
 .toggle-btn.tour { color: #38e8a066; border-color: #1e3a2a; }
 .toggle-btn.tour:hover { color: #38e8a0; border-color: #38e8a0; }
 .toggle-btn.tour.active { color: #38e8a0; border-color: #38e8a0; }
+
+.sim-clock {
+  position: fixed;
+  bottom: 28px;
+  left: 24px;
+  font-family: 'Courier New', monospace;
+  background: rgba(6, 8, 15, 0.85);
+  border: 0.5px solid #1e3a5f;
+  border-radius: 8px;
+  padding: 12px 16px;
+  z-index: 10;
+}
+
+.sim-clock-label {
+  font-size: 9px;
+  color: #2a4a7a;
+  letter-spacing: 0.15em;
+  margin-bottom: 4px;
+}
+
+.sim-clock-date {
+  font-size: 16px;
+  color: #c8d8f0;
+  letter-spacing: 0.1em;
+  font-weight: bold;
+}
+
+.sim-clock-day {
+  font-size: 9px;
+  color: #3b6ee8;
+  letter-spacing: 0.12em;
+  margin-top: 2px;
+  margin-bottom: 10px;
+}
+
+.tonight-btn {
+  font-size: 9px;
+  color: #38e8a066;
+  background: none;
+  border: 0.5px solid #1e3a2a;
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.1em;
+  width: 100%;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.tonight-btn:hover {
+  color: #38e8a0;
+  border-color: #38e8a0;
+}
+
+.tonight-btn.active {
+  color: #38e8a0;
+  border-color: #38e8a0;
+}

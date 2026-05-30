@@ -1,20 +1,20 @@
 <html>
 <head>
-    <style>
-      html, body { margin: 0; padding: 0; overflow: hidden; background: #06080f; }
-    </style>
-    <link rel="stylesheet" href="fp.css">
-    <script src="https://www.cs.unm.edu/~angel/WebGL/7E/Common/initShaders.js" defer></script>
-    <script src="https://www.cs.unm.edu/~angel/WebGL/7E/Common/MV.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/gh/brent-munsell/graphics/models/msphere.js" defer></script>
-    <script src="listeners.js" defer></script>
-    <script src="helpers.js" defer></script>
-    <script src="fp.js" defer></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #06080f; }
+  </style>
+  <link rel="stylesheet" href="fp.css">
+  <script src="https://www.cs.unm.edu/~angel/WebGL/7E/Common/initShaders.js" defer></script>
+  <script src="https://www.cs.unm.edu/~angel/WebGL/7E/Common/MV.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/brent-munsell/graphics/models/msphere.js" defer></script>
+  <script src="kepler.js" defer></script>
+  <script src="listeners.js" defer></script>
+  <script src="helpers.js" defer></script>
+  <script src="fp.js" defer></script>
 </head>
 <body>
 
   <canvas id="webgl-canvas"></canvas>
-
   <div id="planet-label"></div>
 
   <div class="hud-left">
@@ -72,6 +72,15 @@
     </div>
   </div>
 
+  <div class="sim-clock">
+    <div class="sim-clock-label">SIM DATE</div>
+    <div class="sim-clock-date" id="sim-date">29 MAY 2026</div>
+    <div class="sim-clock-day" id="sim-day">DAY 149</div>
+    <button class="tonight-btn" id="btn-tonight" onclick="use_real_positions ? deactivateRealPositions() : activateRealPositions()">
+      TONIGHT'S SKY
+    </button>
+  </div>
+
   <div class="view-toggle">
     <button class="toggle-btn active" id="btn-solar" onclick="setView('solar')">SOLAR VIEW</button>
     <button class="toggle-btn" id="btn-orrery" onclick="setView('orrery')">ORRERY</button>
@@ -95,27 +104,13 @@
   varying vec2 fTexCoord;
   void main() {
     vec3 pos = vertex.xyz * props.w;
-    float c = cos(props.y);
-    float s = sin(props.y);
-    mat4 ry = mat4(
-      vec4(c, 0.0, s, 0.0),
-      vec4(0.0, 1.0, 0.0, 0.0),
-      vec4(-s, 0.0, c, 0.0),
-      vec4(0.0, 0.0, 0.0, 1.0)
-    );
-    mat4 translate = mat4(
-      vec4(1.0, 0.0, 0.0, 0.0),
-      vec4(0.0, 1.0, 0.0, 0.0),
-      vec4(0.0, 0.0, 1.0, 0.0),
-      vec4(trans.x, trans.y, trans.z, 1.0)
-    );
+    float c = cos(props.y); float s = sin(props.y);
+    mat4 ry = mat4(vec4(c,0.0,s,0.0),vec4(0.0,1.0,0.0,0.0),vec4(-s,0.0,c,0.0),vec4(0.0,0.0,0.0,1.0));
+    mat4 translate = mat4(vec4(1.0,0.0,0.0,0.0),vec4(0.0,1.0,0.0,0.0),vec4(0.0,0.0,1.0,0.0),vec4(trans.x,trans.y,trans.z,1.0));
     vec4 position = translate * ry * vec4(pos, 1.0);
-    vec3 v_p = -(P * V * position).xyz;
-    vec3 v_l = light.xyz;
-    vec3 v_n = (ry * normal).xyz;
-    L = normalize(v_l - v_p);
+    L = normalize(light.xyz - (-(P * V * position).xyz));
     E = -eye;
-    N = normalize(v_n);
+    N = normalize((ry * normal).xyz);
     fTexCoord = texCoord;
     gl_Position = P * V * position;
   }
@@ -130,22 +125,20 @@
   varying vec3 N, L, E;
   varying vec2 fTexCoord;
   float shininess = 800.0;
-  vec4 kd = vec4(0.9, 0.9, 0.9, 1.0);
-  vec4 ka = vec4(0.2, 0.2, 0.2, 1.0);
+  vec4 kd = vec4(0.9,0.9,0.9,1.0);
+  vec4 ka = vec4(0.2,0.2,0.2,1.0);
   void main() {
     vec4 texColor = texture2D(textureSampler, fTexCoord);
     if (shading_enabled == 0) {
       gl_FragColor = vec4(texColor.rgb, texColor.a * u_alpha);
     } else {
       vec3 H = normalize(L + E);
-      float diffuseFactor = max(dot(L, N), 0.0);
-      vec4 diffuse = kd * texColor * diffuseFactor;
+      float d = max(dot(L, N), 0.0);
+      vec4 diffuse = kd * texColor * d;
       vec4 ambient = ka * texColor;
-      float specularFactor = pow(max(dot(N, H), 0.0), shininess);
-      vec4 specular = vec4(specularFactor, specularFactor, specularFactor, 1.0);
-      if (dot(L, N) < 0.0) {
-        specular = vec4(0.0, 0.0, 0.0, 1.0);
-      }
+      float sf = pow(max(dot(N, H), 0.0), shininess);
+      vec4 specular = vec4(sf,sf,sf,1.0);
+      if (dot(L,N) < 0.0) specular = vec4(0.0,0.0,0.0,1.0);
       gl_FragColor = vec4((diffuse + ambient + specular).rgb, u_alpha);
     }
   }
