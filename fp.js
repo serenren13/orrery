@@ -133,6 +133,7 @@ function configure() {
   webgl_context.enable(webgl_context.BLEND);
   webgl_context.blendFunc(webgl_context.SRC_ALPHA, webgl_context.ONE_MINUS_SRC_ALPHA);
 
+  buildRingBuffer();
   setupMouseInteraction();
   setupPlanetSymbols();
   setupDateScrubber();
