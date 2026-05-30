@@ -212,8 +212,6 @@ function drawRing(radius, planetIndex, selected) {
     webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, radius);
     webgl_context.drawArrays(webgl_context.TRIANGLE_STRIP, 0, 258);
   }
-
-  restoreSphereBuffer();
 }
 // ============================================================
 // Vertex/Normal/TexCoord data
@@ -691,4 +689,8 @@ createTexCoordData();
 configure();
 loadTextures();
 allocateMemory();
-setInterval(draw, 33);
+function loop() {
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
