@@ -65,9 +65,9 @@ const up = vec3(0.0, 1.0, 0.0);
 
 let url_map = new Map();
 
-url_map.set("sun", "sun.jpg");
-url_map.set("earth", "earth.jpg");
-url_map.set("moon", "moon.jpg");
+url_map.set("sun", "2k_sun.jpg");
+url_map.set("earth", "2k_earth_daymap.jpg");
+url_map.set("moon", "2k_moon.jpg");
 
 // ----------------------------------------------
 // Earth orbit parameters
