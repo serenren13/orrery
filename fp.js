@@ -175,6 +175,13 @@ function buildRingBuffer() {
   webgl_context.bufferData(webgl_context.ARRAY_BUFFER, new Float32Array(verts), webgl_context.STATIC_DRAW);
 }
 
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3), 16) / 255;
+  const g = parseInt(hex.slice(3,5), 16) / 255;
+  const b = parseInt(hex.slice(5,7), 16) / 255;
+  return { r, g, b };
+}
+
 function drawRing(radius, selected) {
   webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
   webgl_context.vertexAttribPointer(attr_vertex, 3, webgl_context.FLOAT, false, 0, 0);
@@ -182,22 +189,26 @@ function drawRing(radius, selected) {
   webgl_context.uniform4f(uniform_trans, 0.0, 0.0, 0.0, 1.0);
 
   if (selected) {
-    // Three passes: wide soft glow, medium, crisp bright
+    const { r, g, b } = hexToRgb(PLANET_DATA[selected_planet].color);
     const passes = [
       { scale: radius * 1.06, alpha: 0.06 },
       { scale: radius * 1.025, alpha: 0.18 },
       { scale: radius,         alpha: 0.85 },
     ];
     for (const pass of passes) {
+      webgl_context.uniform4f(uniform_color, r, g, b, 1.0);
       webgl_context.uniform1f(uniform_alpha, pass.alpha);
       webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, pass.scale);
-      webgl_context.drawArrays(webgl_context.TRIANGLE_STRIP, 0, RING_VERTS);
+      webgl_context.drawArrays(webgl_context.TRIANGLE_STRIP, 0, 258);
     }
   } else {
+    webgl_context.uniform4f(uniform_color, 0.4, 0.5, 0.7, 1.0);
     webgl_context.uniform1f(uniform_alpha, 0.18);
     webgl_context.uniform4f(uniform_props, 0.0, 0.0, 0.0, radius);
-    webgl_context.drawArrays(webgl_context.TRIANGLE_STRIP, 0, RING_VERTS);
+    webgl_context.drawArrays(webgl_context.TRIANGLE_STRIP, 0, 258);
   }
+
+  restoreSphereBuffer();
 }
 // ============================================================
 // Vertex/Normal/TexCoord data

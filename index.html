@@ -151,7 +151,7 @@
   void main() {
     vec4 texColor = texture2D(textureSampler, fTexCoord);
     if (shading_enabled == 0) {
-      gl_FragColor = vec4(texColor.rgb, texColor.a * u_alpha);
+      gl_FragColor = vec4(color.rgb, u_alpha);
     } else {
       vec3 H = normalize(L + E);
       float d = max(dot(L, N), 0.0);
