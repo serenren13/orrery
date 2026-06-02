@@ -50,6 +50,8 @@ let selected_planet = 2;
 let grand_tour_active = false;
 let grand_tour_index = 0;
 let grand_tour_timer = null;
+let _tour_prev_time_mode = 'simulated';
+let _tour_prev_real_positions = false;
 
 // Time mode
 let time_mode = "simulated";
@@ -155,6 +157,13 @@ function configure() {
   const v = VIEWS.system;
   xt = v.x; yt = v.y; zt = v.z; fov = v.fov;
   syncSphericalFromCartesian();
+
+  // Resize handler
+  window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    webgl_context.viewport(0, 0, canvas.width, canvas.height);
+  });
 }
 
 // ============================================================
@@ -363,7 +372,10 @@ function flyToPlanetSolar(index) {
   const tx = pos.x;
   const ty = Math.max(0.06, p.r * 0.15);
   const tz = pos.z + offset + p.r * 0.28;
-  fov = 60;
+
+  // widen FOV for outer planets so they're actually in frame
+  fov =index >= 5 ? 80 : 60; // Saturn, Uranus, Nepture get wider view
+
   setView('solar', false);
   tracking_active = false; // pause tracking during lerp
   flyToPosition(tx, ty, tz, 2000, () => {
@@ -738,6 +750,13 @@ function startGrandTour() {
   grand_tour_active = true;
   grand_tour_index = 0;
   document.getElementById("btn-tour").classList.add("active");
+
+  // lock to live real positions so planets don't drift mid-lerp
+  _tour_prev_time_mode = time_mode;
+  _tour_prev_real_positions = use_real_positions;
+  use_real_positions = true;
+  time_mode = 'live';
+
   tourNext();
 }
 
@@ -752,6 +771,10 @@ function stopGrandTour() {
   grand_tour_active = false;
   clearTimeout(grand_tour_timer);
   document.getElementById("btn-tour").classList.remove("active");
+
+  // restore whatever the user had before
+  time_mode = _tour_prev_time_mode || 'simulated';
+  use_real_positions = _tour_prev_real_positions || false;
 }
 
 // ============================================================
