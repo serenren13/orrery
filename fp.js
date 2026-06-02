@@ -154,6 +154,7 @@ function configure() {
 
   const v = VIEWS.system;
   xt = v.x; yt = v.y; zt = v.z; fov = v.fov;
+  syncSphericalFromCartesian();
 }
 
 // ============================================================
@@ -336,6 +337,7 @@ function tickLerp() {
   zt = lerp_from.z + (lerp_to.z - lerp_from.z) * e;
   if (t >= 1.0) {
     cam_lerping = false;
+    syncSphericalFromCartesian();
     document.querySelector(".hud-left").classList.remove("hidden");
     document.querySelector(".hud-right").classList.remove("hidden");
     if (cam_lerp_done_cb) { cam_lerp_done_cb(); cam_lerp_done_cb = null; }
@@ -359,8 +361,8 @@ function flyToPlanetSolar(index) {
   // Fixed offset behind the planet proportional to its size, capped so we never go inside it
   const offset = Math.max(p.sz * 2.5, 0.15);
   const tx = pos.x;
-  const ty = 0.06;
-  const tz = pos.z + offset;
+  const ty = Math.max(0.06, p.r * 0.15);
+  const tz = pos.z + offset + p.r * 0.28;
   fov = 60;
   setView('solar', false);
   tracking_active = false; // pause tracking during lerp
@@ -494,31 +496,80 @@ function tickSimDate() {
 let hover_label = null;
 let _last_VP = null, _last_P = null;
 
+// Spherical coords — synced from xt/yt/zt
+let cam_theta = 0;
+let cam_phi = 0.3;
+let cam_radius = 1.0;
+let is_dragging = false;
+let drag_start = { x: 0, y: 0 };
+let drag_moved = false;
+
+function syncSphericalFromCartesian() {
+  cam_radius = Math.sqrt(xt*xt + yt*yt + zt*zt);
+  cam_theta = Math.atan2(xt, zt);
+  cam_phi = Math.asin(Math.max(-1, Math.min(1, yt / cam_radius)));
+}
+
+function syncCartesianFromSpherical() {
+  xt = cam_radius * Math.sin(cam_theta) * Math.cos(cam_phi);
+  yt = cam_radius * Math.sin(cam_phi);
+  zt = cam_radius * Math.cos(cam_theta) * Math.cos(cam_phi);
+}
+
 function setupMouseInteraction() {
   hover_label = document.getElementById("planet-label");
 
-  canvas.addEventListener("mousemove", function(e) {
-    if (!_last_VP || !_last_P) return;
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    let found = false;
-    for (let i = 0; i < PLANET_DATA.length; i++) {
-      const sp = worldToScreen(planet_positions[i].x, 0, planet_positions[i].z);
-      if (!sp) continue;
-      const dx = mx - sp.x, dy = my - sp.y;
-      if (Math.sqrt(dx*dx+dy*dy) < Math.max(PLANET_DATA[i].sz * canvas.height * 0.4, 18)) {
-        hover_label.style.display = "block";
-        hover_label.style.left = (sp.x + 14) + "px";
-        hover_label.style.top  = (sp.y - 8) + "px";
-        hover_label.textContent = PLANET_DATA[i].name;
-        canvas.style.cursor = "pointer";
-        found = true; break;
-      }
-    }
-    if (!found) { hover_label.style.display = "none"; canvas.style.cursor = "default"; }
+  canvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    is_dragging = true;
+    drag_moved = false;
+    drag_start = { x: e.clientX, y: e.clientY };
+    canvas.style.cursor = "grabbing";
   });
 
-  canvas.addEventListener("click", function(e) {
+  canvas.addEventListener('mousemove', e => {
+    // hover labels
+    if (!cam_lerping && _last_VP && _last_P) {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      let found = false;
+      for (let i = 0; i < PLANET_DATA.length; i++) {
+        const sp = worldToScreen(planet_positions[i].x, 0, planet_positions[i].z);
+        if (!sp) continue;
+        const ddx = mx - sp.x, ddy = my - sp.y;
+        if (Math.sqrt(ddx*ddx+ddy*ddy) < Math.max(PLANET_DATA[i].sz * canvas.height * 0.4, 18)) {
+          hover_label.style.display = "block";
+          hover_label.style.left = (sp.x + 14) + "px";
+          hover_label.style.top  = (sp.y - 8) + "px";
+          hover_label.textContent = PLANET_DATA[i].name;
+          if (!is_dragging) canvas.style.cursor = "pointer";
+          found = true; break;
+        }
+      }
+      if (!found && !is_dragging) { hover_label.style.display = "none"; canvas.style.cursor = "default"; }
+      if (!found && is_dragging)  { hover_label.style.display = "none"; }
+    }
+
+    // orbital drag
+    if (!is_dragging || cam_lerping || view_mode === 'orrery') return;
+
+    const dx = e.clientX - drag_start.x;
+    const dy = e.clientY - drag_start.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) drag_moved = true;
+    drag_start = { x: e.clientX, y: e.clientY };
+
+    cam_theta -= dx * 0.005;
+    cam_phi = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, cam_phi + dy * 0.005));
+    syncCartesianFromSpherical();
+    tracking_active = false;
+  });
+
+  canvas.addEventListener('mouseup', e => {
+    is_dragging = false;
+    canvas.style.cursor = "default";
+
+    if (drag_moved) return; // was a drag, not a click
+
     if (cam_lerping) return;
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
@@ -533,6 +584,44 @@ function setupMouseInteraction() {
       }
     }
   });
+
+  canvas.addEventListener('mouseleave', () => {
+    is_dragging = false;
+    canvas.style.cursor = "default";
+    hover_label.style.display = "none";
+  });
+
+  // scroll to zoom
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (cam_lerping || view_mode === 'orrery') return;
+    const sensitivity = view_mode === 'solar' ? 0.0003 : 0.001;
+    cam_radius = Math.max(0.15, Math.min(8.0, cam_radius + e.deltaY * sensitivity));
+    syncCartesianFromSpherical();
+  }, { passive: false });
+
+  // touch support
+  let last_touch = null;
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      last_touch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      drag_moved = false;
+    }
+  });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && last_touch && !cam_lerping && view_mode !== 'orrery') {
+      const dx = e.touches[0].clientX - last_touch.x;
+      const dy = e.touches[0].clientY - last_touch.y;
+      drag_moved = true;
+      last_touch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      cam_theta -= dx * 0.005;
+      cam_phi = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, cam_phi + dy * 0.005));
+      syncCartesianFromSpherical();
+      tracking_active = false;
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => { last_touch = null; });
 }
 
 function worldToScreen(wx, wy, wz) {
