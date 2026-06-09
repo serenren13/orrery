@@ -174,14 +174,16 @@ function buildRingBuffer() {
   // Each segment has 2 verts (inner + outer), connected as triangles
   const STEPS = 128;
   let verts = [];
+  const INNER = 0.992;
+  const OUTER = 1.008;
   for (let i = 0; i <= STEPS; i++) {
     const angle = (i / STEPS) * Math.PI * 2;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     // inner vertex (slightly inside radius, will be scaled by uniform)
-    verts.push(cos * 0.97, 0.0, sin * 0.97);
+    verts.push(cos * INNER, 0.0, sin * INNER);
     // outer vertex (slightly outside radius)
-    verts.push(cos * 1.03, 0.0, sin * 1.03);
+    verts.push(cos * OUTER, 0.0, sin * OUTER);
   }
   ring_buffer = webgl_context.createBuffer();
   webgl_context.bindBuffer(webgl_context.ARRAY_BUFFER, ring_buffer);
@@ -206,8 +208,8 @@ function drawRing(radius, planetIndex, selected) {
 
   if (selected || view_mode === 'orrery') {
     const passes = [
-      { scale: radius * 1.06, alpha: 0.06 },
-      { scale: radius * 1.025, alpha: 0.18 },
+      { scale: radius * 1.02, alpha: 0.06 },
+      { scale: radius * 1.01, alpha: 0.18 },
       { scale: radius,         alpha: 0.85 },
     ];
     for (const pass of passes) {
@@ -366,6 +368,10 @@ function selectPlanet(index, flyTo) {
 
 function flyToPlanetSolar(index) {
   const p = PLANET_DATA[index];
+  // Read fresh positions directly instead of using cached planet_positions
+  const positions = (use_real_positions && typeof getRealPlanetPositions === "function")
+    ? getRealPlanetPositions(sim_date)
+    : planet_positions;
   const pos = planet_positions[index];
   // Fixed offset behind the planet proportional to its size, capped so we never go inside it
   const offset = Math.max(p.sz * 2.5, 0.15);
