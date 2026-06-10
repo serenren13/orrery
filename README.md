@@ -1,6 +1,6 @@
 # 🪐 Orrery — Interactive WebGL Solar System
 
-A real-time, interactive 3D solar system built from scratch in raw WebGL — no Three.js, no game engine, no shortcuts. Features all 8 planets with real NASA texture maps, Keplerian orbital mechanics, per-planet glowing orbit rings, and three camera modes including a top-down rainbow orrery view.
+A real-time, interactive 3D solar system built from scratch in raw WebGL — no Three.js, no game engine, no shortcuts. Features all 8 planets with real NASA texture maps, Keplerian orbital mechanics, per-planet glowing orbit rings, three camera modes, and a cinematic landing screen.
 
 Live demo: [serenren13.github.io/orrery](https://serenren13.github.io/orrery)
 
@@ -22,7 +22,9 @@ Live demo: [serenren13.github.io/orrery](https://serenren13.github.io/orrery)
 
 Orrery is an interactive solar system simulator built entirely in raw WebGL (no abstraction libraries). It renders all 8 planets with real 2K NASA texture maps, physically-motivated Keplerian orbital speeds, and a custom ribbon-quad glow ring system for orbit paths. The project supports three view modes (Solar, System, Orrery), a Grand Tour automation mode, live and simulated time with a date scrubber from 1900–2100, and per-planet info cards.
 
-This project was built on top of a WebGL sphere renderer originally written for **COMP 590: Introduction to Computer Graphics** at UNC Chapel Hill. The original codebase provided the sphere mesh geometry, shader infrastructure, and texture pipeline. Everything else — the orbital simulation, camera system, UI, ring rendering, Kepler math, and interaction layer — was designed and built from scratch as an independent extension.
+On load, a cinematic landing screen — pure CSS/SVG, no WebGL weight — displays the solar system from a low orbital angle with technical HUD annotations, observer geolocation, and a breathing ORRERY wordmark. The landing screen doubles as the loading screen; WebGL initializes behind it while the user reads it.
+
+This project was built on top of a WebGL sphere renderer originally written for **COMP 590: Introduction to Computer Graphics** at UNC Chapel Hill. The original codebase provided the sphere mesh geometry, shader infrastructure, and texture pipeline. Everything else — the orbital simulation, camera system, UI, ring rendering, Kepler math, interaction layer, and landing screen — was designed and built from scratch as an independent extension.
 
 ---
 
@@ -34,7 +36,6 @@ This is a static web project. No build step, no npm, no dependencies to install 
 ```bash
 git clone https://github.com/serenren13/orrery.git
 cd orrery
-# open index.html in a browser, or use a local server:
 npx serve .
 # or
 python3 -m http.server
@@ -48,6 +49,7 @@ The project is deployed via GitHub Pages from the `main` branch root. Push to `m
 **External dependencies (CDN, no install needed):**
 - `initShaders.js` and `MV.js` — from Angel & Shreiner's *Interactive Computer Graphics* (UNM mirror)
 - `msphere.js` — sphere mesh geometry (Brent Munsell, via jsDelivr)
+- `Space Mono` — Google Fonts (landing screen typography)
 
 **Texture files** must be present in the project root. They are sourced from NASA's Solar System Exploration texture library (2K resolution):
 ```
@@ -63,12 +65,13 @@ The project is deployed via GitHub Pages from the `main` branch root. Push to `m
 
 | Control | Action |
 |---|---|
+| **ENTER** on landing screen | Fade into the orrery |
 | **SOLAR / SYSTEM / ORRERY** buttons | Switch between camera views |
 | **Planet symbol bar** (top) | Select a planet — updates info card and highlights its ring |
 | **Click a planet** in the scene | Select and fly to it (in Solar view) |
 | **Hover a planet** | Shows name label |
 | **GRAND TOUR** button | Auto-cycles through all 8 planets |
-| **SIMULATED / LIVE** toggle | Switch between real-time clock and scrubable simulation |
+| **SIMULATED / LIVE** toggle | Switch between real-time clock and scrubbable simulation |
 | **Date scrubber** | Drag to any date between 1900 and 2100 |
 | **SNAP TO TODAY** | Resets simulation date to today |
 | **Camera sliders** (X, Y, Z, FOV) | Manual camera control |
@@ -79,16 +82,16 @@ The project is deployed via GitHub Pages from the `main` branch root. Push to `m
 ## Major Components and Features
 
 ### `fp.js` — Core Renderer and Simulation Loop
-The main file. Manages the WebGL draw loop, planet animation, camera lerp system, planet selection, time simulation, and all rendering calls. Planets are animated using angular velocity derived from real orbital periods. The draw loop runs at ~30fps via `setInterval`.
+The main file. Manages the WebGL draw loop, planet animation, camera lerp system, planet selection, time simulation, all rendering calls, and the landing overlay initialization. Planets are animated using angular velocity derived from real orbital periods.
 
 ### `kepler.js` — Orbital Mechanics
 Implements Kepler's equation for real planetary positions when Live mode or the date scrubber is active. Solves the eccentric anomaly iteratively and converts to heliocentric (x, z) coordinates in the simulation's scaled coordinate system.
 
-### `index.html` — Shaders and UI
-Contains the GLSL vertex and fragment shaders as inline `<script>` tags. The vertex shader handles sphere scaling, Y-axis rotation, and translation in a single pass using the `props` and `trans` uniforms. The fragment shader supports two rendering modes: Phong-shaded texture sampling (planets) and flat solid-color output (orbit rings), toggled via the `use_solid_color` uniform.
+### `index.html` — Shaders, UI, and Landing Screen
+Contains the GLSL vertex and fragment shaders as inline `<script>` tags, all HUD markup, and the cinematic landing overlay. The landing overlay is a full-screen CSS/SVG layer with animated annotations, twinkling stars, a perspective orbital scene, and an ENTER button that fades it out.
 
-### `fp.css` — UI Styling
-All HUD panels, info cards, planet symbol bar, time panel, and view toggles. Designed for a dark space aesthetic with monospace type and per-planet CSS custom properties for color theming.
+### `fp.css` — UI and Landing Styling
+All HUD panels, info cards, planet symbol bar, time panel, view toggles, and the complete landing overlay animation system. Designed for a dark space aesthetic with monospace type and per-planet CSS custom properties for color theming.
 
 ### `listeners.js` — Camera Sliders
 Event listeners for the camera position (X/Y/Z), FOV, and orbit speed range inputs.
@@ -96,11 +99,14 @@ Event listeners for the camera position (X/Y/Z), FOV, and orbit speed range inpu
 ### `helpers.js` — Geometry Utilities
 From the original COMP 590 codebase. Provides `flipz()` and `setVOriginToZero()` for mesh geometry manipulation.
 
+### Cinematic Landing Screen
+A full-screen CSS/SVG overlay that loads instantly with zero WebGL dependency. Features a perspective orbital scene (SVG ellipses), animated star field, breathing wordmark, word-by-word subtitle reveal, pulsing ENTER button, corner HUD annotations with live Julian date and observer geolocation, and a `SOL · ORION ARM · MILKY WAY · LOCAL GROUP` breadcrumb. Fades out on ENTER to reveal the WebGL orrery behind it.
+
 ### Orbit Ring System
-Each orbit path is rendered as a WebGL ribbon quad strip (`TRIANGLE_STRIP`) — a thin band of triangles forming a ring at each planet's orbital radius. In Solar and System views, only the selected planet's ring gets a 3-pass glow effect (wide soft pass, medium pass, crisp bright pass). In Orrery view, all 8 rings glow simultaneously in their planet's color, producing the rainbow top-down view.
+Each orbit path is rendered as a WebGL ribbon quad strip (`TRIANGLE_STRIP`) with inner/outer radii at `0.992`/`1.008` of the orbital radius (tightened from `0.97`/`1.03` to ensure visibility at Mercury's scale). In Solar and System views, only the selected planet's ring gets a 3-pass glow effect. In Orrery view, all 8 rings glow simultaneously.
 
 ### Camera System
-Three preset views (Solar, System, Orrery) with smooth cubic ease-in-out camera interpolation (`flyToPosition`). Clicking a planet in Solar view triggers a fly-to animation that positions the camera behind the planet at a proportional offset. The Grand Tour automates this across all 8 planets on a timer.
+Three preset views (Solar, System, Orrery) with smooth cubic ease-in-out camera interpolation. Planet fly-to uses per-planet `ty` scaling — outer planets (Uranus, Neptune) get a higher camera floor and wider FOV to prevent ring clipping. The Grand Tour automates fly-to across all 8 planets on a timer, reading fresh ephemeris positions directly rather than cached `planet_positions`.
 
 ---
 
@@ -112,21 +118,30 @@ Three preset views (Solar, System, Orrery) with smooth cubic ease-in-out camera 
 | Moon orbiting Earth | ✅ Complete |
 | Venus atmospheric layer | ✅ Complete |
 | Milky Way skybox | ✅ Complete |
-| Phong lighting model (sun as light source) | ✅ Complete |
+| Phong lighting model | ✅ Complete |
 | Per-planet orbit rings (ribbon quad strip) | ✅ Complete |
 | Per-planet ring glow color | ✅ Complete |
-| Rainbow orrery mode (all rings glowing) | ✅ Complete |
+| Rainbow orrery mode | ✅ Complete |
 | Three camera view modes | ✅ Complete |
 | Camera lerp with ease-in-out | ✅ Complete |
 | Planet selection (click + symbol bar) | ✅ Complete |
 | Grand Tour automation | ✅ Complete |
+| Grand tour stale position fix | ✅ Complete |
+| Mercury ring visibility fix | ✅ Complete |
+| Outer planet ring clipping fix | ✅ Complete |
 | Info card per planet | ✅ Complete |
 | Live time mode | ✅ Complete |
-| Simulated time with date scrubber (1900–2100) | ✅ Complete |
+| Simulated time with date scrubber | ✅ Complete |
 | Keplerian real positions | ✅ Complete |
 | Hover label on mouseover | ✅ Complete |
-| Fly-to camera for outer planets (Uranus/Neptune) | ⚠️ Needs offset scaling |
-| Favicon | ⚠️ Missing (404) |
+| Cinematic landing overlay | ✅ Complete |
+| Corner HUD annotations on landing | ✅ Complete |
+| Observer geolocation on landing | ✅ Complete |
+| Camera zoom intro sequence on ENTER | 🔲 Planned |
+| Mobile responsive HUD | 🔲 Planned |
+| Modular file split (planets/camera/ui/tour) | 🔲 Planned |
+| Live mode planet-ring drift fix | 🔲 Planned |
+| Favicon | ⚠️ Missing |
 
 ---
 
@@ -139,10 +154,10 @@ There is no scene graph or abstraction layer. Every frame, the JavaScript manual
 3. Uploads uniform values to the GPU (camera position, light position, transform props)
 4. Binds the correct VBOs (vertex, normal, texcoord) and draws with `gl.TRIANGLES`
 
-The vertex shader receives `props` as a `vec4` where `.w` is the uniform scale and `.y` is the Y-rotation angle. It builds rotation and translation matrices inline in GLSL and applies them per vertex — no model matrix uniform, everything derived from `props` and `trans` at draw time.
+The vertex shader receives `props` as a `vec4` where `.w` is the uniform scale and `.y` is the Y-rotation angle. It builds rotation and translation matrices inline in GLSL — no model matrix uniform, everything derived from `props` and `trans` at draw time.
 
 ### Sphere Geometry
-Sphere vertices, normals, and faces come from `msphere.js` (a precomputed icosphere subdivision). Texture coordinates are computed analytically from vertex positions using spherical projection:
+Sphere vertices, normals, and faces come from `msphere.js`. Texture coordinates are computed analytically using spherical projection:
 ```
 θ = atan2(x, z)         → maps to U: (θ + π) / 2π
 φ = atan2(√(x²+z²), y) → maps to V: φ / π
@@ -156,19 +171,18 @@ angular_velocity = base_speed × (Earth_period / planet_period)
 In Live/scrubber mode, `kepler.js` solves Kepler's equation for the true anomaly given a Julian date, returning heliocentric (x, z) in AU scaled to the simulation's coordinate space.
 
 ### Phong Lighting
-The fragment shader implements Phong shading with ambient, diffuse, and specular components. The sun is the light source at the origin. Shininess is fixed at 800.0 (high specular for the wet-look planet surfaces). The specular term is zeroed when `dot(L, N) < 0` to avoid backface highlights.
+The fragment shader implements Phong shading with ambient, diffuse, and specular components. The sun is the light source at the origin. Shininess is fixed at 800.0. The specular term is zeroed when `dot(L, N) < 0` to avoid backface highlights.
 
 ### Orbit Ring Rendering
-Each ring is a `TRIANGLE_STRIP` of 258 vertices (129 pairs of inner/outer points at radii 0.97 and 1.03, scaled by the planet's orbital radius uniform). The selected ring uses three draw passes at slightly different radii and alpha values to fake a glow blur in screen space — a pure GPU approach with no post-processing or 2D canvas overlay.
-
-The fragment shader routes ring draws through a `use_solid_color` uniform branch, bypassing texture sampling entirely and outputting `vec4(color.rgb, u_alpha)` directly.
+Each ring is a `TRIANGLE_STRIP` of 258 vertices (129 pairs of inner/outer points). The selected ring uses three draw passes at slightly different radii and alpha values to simulate a glow effect entirely on the GPU — no post-processing or 2D canvas overlay.
 
 ---
 
 ## Credits
 
-- **Serenity Phillips** — orbital simulation, camera system, ring renderer, UI, shaders, Kepler math, all extensions beyond the base sphere renderer
+- **Serenity Phillips** — orbital simulation, camera system, ring renderer, UI, shaders, Kepler math, cinematic landing screen, all extensions beyond the base sphere renderer
 - **Base sphere renderer** — adapted from COMP 590: Introduction to Computer Graphics coursework, UNC Chapel Hill
 - **Shader infrastructure** (`initShaders.js`, `MV.js`) — Edward Angel & Dave Shreiner, *Interactive Computer Graphics*, 7th ed.
 - **Sphere mesh** (`msphere.js`) — Brent Munsell
 - **Textures** — NASA Solar System Exploration (public domain, 2K series)
+- **Typography** — Space Mono (Google Fonts)
