@@ -83,7 +83,7 @@ let sun_rot = 0;
 let stars_rot = 0;
 
 const VIEWS = {
-  solar:  { x:0.0, y:0.08, z:0.55, fov:60 },
+  solar:  { x:0.0, y:0.15, z:0.55, fov:60 },
   system: { x:0.0, y:0.55, z:0.85, fov:65 },
   orrery: { x:0.0, y:1.8,  z:0.01, fov:72 },
 };
@@ -372,17 +372,24 @@ function flyToPlanetSolar(index) {
   const positions = (use_real_positions && typeof getRealPlanetPositions === "function")
     ? getRealPlanetPositions(sim_date)
     : planet_positions;
-  const pos = planet_positions[index];
+  const pos = positions[index];
   // Fixed offset behind the planet proportional to its size, capped so we never go inside it
   const offset = Math.max(p.sz * 2.5, 0.15);
   const tx = pos.x;
-  const ty = Math.max(0.06, p.r * 0.15);
-  const tz = pos.z + offset + p.r * 0.28;
+  // Keep camera high enough above plane so large rings don't clip viewport
+  const ty = p.r < 0.5
+    ? Math.max(0.06, p.r * 0.15)  // inner planets - stay close
+    : Math.max(0.5, p.r * 0.35); // outer planets - pull up more
+  const tz = pos.z + offset + Math.min(p.r * 0.28, 0.35);
 
   // widen FOV for outer planets so they're actually in frame
-  fov =index >= 5 ? 80 : 60; // Saturn, Uranus, Nepture get wider view
+  fov = index === 7 ? 95 : index >= 5 ? 85 : 60; // Saturn, Uranus, Nepture get wider view
 
-  setView('solar', false);
+  view_mode = 'solar';
+  document.getElementById('btn-solar').classList.add('active');
+  document.getElementById('btn-system').classList.remove('active');
+  document.getElementById('btn-orrery').classList.remove('active');
+
   tracking_active = false; // pause tracking during lerp
   flyToPosition(tx, ty, tz, 2000, () => {
     tracking_active = true; // kick in after lerp lands
