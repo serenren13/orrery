@@ -11,10 +11,12 @@
   <script src="lib/kepler.js" defer></script>
   <script src="lib/listeners.js" defer></script>
   <script src="lib/helpers.js" defer></script>
+  <script src="src/globals.js" defer></script>
   <script src="src/planets.js" defer></script>
   <script src="src/camera.js" defer></script>
   <script src="src/ui.js" defer></script>
   <script src="src/tour.js" defer></script>
+  <script src="src/render.js" defer></script>
   <script src="main.js" defer></script>
 </head>
 <body>
@@ -243,7 +245,7 @@
     fTexCoord = texCoord;
     gl_Position = P * V * position;
   }
-</scrip>
+</script>
 <script id="fragment-shader" type="x-shader/x-fragment">
   precision mediump float;
   precision lowp int;
