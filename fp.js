@@ -92,18 +92,18 @@ const TEXTURE_KEYS = ["stars","sun","mercury","venus_surface","venus_atmo",
                       "earth","mars","jupiter","saturn","uranus","neptune","moon"];
 
 let url_map = new Map([
-  ["stars",         "2k_stars_milky_way.jpg"],
-  ["sun",           "2k_sun.jpg"],
-  ["mercury",       "2k_mercury.jpg"],
-  ["venus_surface", "2k_venus_surface.jpg"],
-  ["venus_atmo",    "2k_venus_atmosphere.jpg"],
-  ["earth",         "2k_earth_daymap.jpg"],
-  ["mars",          "2k_mars.jpg"],
-  ["jupiter",       "2k_jupiter.jpg"],
-  ["saturn",        "2k_saturn.jpg"],
-  ["uranus",        "2k_uranus.jpg"],
-  ["neptune",       "2k_neptune.jpg"],
-  ["moon",          "2k_moon.jpg"],
+  ["stars",         "textures/2k_stars_milky_way.jpg"],
+  ["sun",           "textures/2k_sun.jpg"],
+  ["mercury",       "textures/2k_mercury.jpg"],
+  ["venus_surface", "textures/2k_venus_surface.jpg"],
+  ["venus_atmo",    "textures/2k_venus_atmosphere.jpg"],
+  ["earth",         "textures/2k_earth_daymap.jpg"],
+  ["mars",          "textures/2k_mars.jpg"],
+  ["jupiter",       "textures/2k_jupiter.jpg"],
+  ["saturn",        "textures/2k_saturn.jpg"],
+  ["uranus",        "textures/2k_uranus.jpg"],
+  ["neptune",       "textures/2k_neptune.jpg"],
+  ["moon",          "textures/2k_moon.jpg"],
 ]);
 
 let ring_buffer = null;
