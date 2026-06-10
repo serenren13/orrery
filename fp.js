@@ -363,26 +363,33 @@ function selectPlanet(index, flyTo) {
   updateInfoCard(index);
   updatePlanetSymbols(index);
   pulseInfoCard(index);
-  if (flyTo) flyToPlanetSolar(index);
+  if (flyTo && view_mode === 'solar') flyToPlanetSolar(index);
 }
 
-function flyToPlanetSolar(index) {
+function cameraFor(index) {
   const p = PLANET_DATA[index];
-  // Read fresh positions directly instead of using cached planet_positions
   const positions = (use_real_positions && typeof getRealPlanetPositions === "function")
     ? getRealPlanetPositions(sim_date)
     : planet_positions;
   const pos = positions[index];
-  // Fixed offset behind the planet proportional to its size, capped so we never go inside it
-  const offset = Math.max(p.sz * 2.5, 0.15);
-  const tx = pos.x;
-  // Keep camera high enough above plane so large rings don't clip viewport
-  const ty = p.r < 0.5
-    ? Math.max(0.06, p.r * 0.15)  // inner planets - stay close
-    : Math.max(0.5, p.r * 0.35); // outer planets - pull up more
-  const tz = pos.z + offset + Math.min(p.r * 0.28, 0.35);
 
-  // widen FOV for outer planets so they're actually in frame
+  const len = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
+  const nx = len > 0 ? pos.x / len : 0;
+  const nz = len > 0 ? pos.z / len : 1;
+
+  const dist = Math.max(p.sz * 3, 0.18 + p.r * 0.25);
+  const ty = p.r < 0.5 ? Math.max(0.08, p.r * 0.2) : Math.max(0.5, p.r * 0.35);
+
+  return {
+    tx: pos.x + nx * dist,
+    ty,
+    tz: pos.z + nz * dist 
+  };
+}
+
+function flyToPlanetSolar(index) {
+  const p = PLANET_DATA[index];
+  const { tx, ty, tz } = cameraFor(index);
   fov = index === 7 ? 95 : index >= 5 ? 85 : 60; // Saturn, Uranus, Nepture get wider view
 
   view_mode = 'solar';
@@ -473,23 +480,21 @@ function setTimeMode(mode) {
   time_mode = mode;
   const simBtn = document.getElementById('btn-simulated');
   const liveBtn = document.getElementById('btn-live');
-  const scrubSection = document.getElementById('scrubber-section');
-  const dateEl = document.getElementById('sim-date');
+  document.getElementById('scrubber-section').style.display = mode === 'live' ? 'none' : 'block';
+  document.getElementById('sim-date').classList.toggle('live-date', mode === 'live');
 
   if (mode === 'live') {
-    simBtn.classList.remove('active');
     liveBtn.classList.add('active', 'live');
-    scrubSection.style.display = 'none';
-    use_real_positions = true;
+    simBtn.classList.remove('active');
     sim_date = new Date();
-    dateEl.classList.add('live-date');
+    use_real_positions = true;
   } else {
-    liveBtn.classList.remove('active', 'live');
     simBtn.classList.add('active');
-    scrubSection.style.display = 'block';
+    liveBtn.classList.remove('active', 'live');
     use_real_positions = false;
-    dateEl.classList.remove('live-date');
   }
+
+  if (view_mode === 'solar') flyToPlanetSolar(selected_planet);
 }
 
 function updateSimDateDisplay() {
@@ -668,12 +673,10 @@ function draw() {
 
       // Planet tracking - follows selected planet in solar view
   if (view_mode === 'solar' && tracking_active && !cam_lerping) {
-    const pos = planet_positions[selected_planet];
-    const p = PLANET_DATA[selected_planet];
-    const offset = Math.max(p.sz * 2.5, 0.15);
-    xt += (pos.x - xt) * 0.05;
-    zt += (pos.z + offset - zt) * 0.05;
-    yt += (0.06 - yt) * 0.05;
+    const cam = cameraFor(selected_planet);
+    xt += (cam.tx - xt) * 0.05;
+    yt += (cam.ty - yt) * 0.05;
+    zt += (cam.tz - zt) * 0.05;
   }
 
   webgl_context.clear(webgl_context.DEPTH_BUFFER_BIT | webgl_context.COLOR_BUFFER_BIT);
@@ -744,15 +747,23 @@ function draw() {
 // ============================================================
 function setView(mode, animate = true) {
   view_mode = mode;
-  tracking_active = false; // stop tracking on any view change
-  const v = VIEWS[mode];
-  fov = v.fov;
-  if (animate) flyToPosition(v.x, v.y, v.z, 2000);
-  else { xt = v.x; yt = v.y; zt = v.z; }
-  ['solar','system','orrery'].forEach(m => {
-    const btn = document.getElementById('btn-' + m);
-    if (btn) btn.classList.toggle('active', m === mode);
-  });
+  const btn = id => document.getElementById('btn-' + id);
+  ['solar', 'system', 'orrery'].forEach(m => btn(m).classList.toggle('active', m === mode));
+
+  if (mode === 'solar') {
+    tracking_active = false;
+    flyToPlanetSolar(selected_planet);
+  } else {
+    tracking_active = false;
+    const v = VIEWS[mode];
+    fov = v.fov;
+    if (animate) flyToPosition(v.x, v.y, v.z, 2000);
+    else { 
+      xt = v.x;
+      yt = v.y;
+      zt = v.z;
+    }
+  }
 }
 
 // ============================================================
