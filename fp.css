@@ -317,3 +317,133 @@ input[type="range"]::-webkit-slider-thumb {
   pointer-events: none;
   z-index: 2;
 }
+
+/* ============================================================
+   CINEMATIC LANDING OVERLAY
+   ============================================================ */
+#landing-overlay {
+  position: fixed;
+  inset: 0;
+  background: #04080f;
+  z-index: 100;
+  font-family: 'Space Mono', monospace;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 14vh;
+  transition: opacity 1.2s ease;
+}
+#landing-overlay.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+@keyframes lo-breathe   { 0%,100%{letter-spacing:0.22em;opacity:0.75} 50%{letter-spacing:0.42em;opacity:1} }
+@keyframes lo-fadein    { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
+@keyframes lo-twinkle1  { 0%,100%{opacity:0.7} 50%{opacity:0.1} }
+@keyframes lo-twinkle2  { 0%,100%{opacity:0.3} 60%{opacity:0.95} }
+@keyframes lo-twinkle3  { 0%,100%{opacity:0.5} 30%{opacity:0.05} }
+@keyframes lo-blink     { 0%,100%{opacity:1} 50%{opacity:0.15} }
+@keyframes lo-pulse     { 0%,100%{border-color:#1a3448;box-shadow:none} 50%{border-color:#3a6a8a;box-shadow:0 0 14px 3px rgba(58,106,138,0.15)} }
+@keyframes lo-w1        { 0%,100%{opacity:0} 8%,100%{opacity:1} }
+@keyframes lo-w2        { 0%,12%{opacity:0} 22%,100%{opacity:1} }
+@keyframes lo-w3        { 0%,18%{opacity:0} 30%,100%{opacity:1} }
+
+.ls-t1 { animation: lo-twinkle1 4.2s ease-in-out infinite; }
+.ls-t2 { animation: lo-twinkle2 3.1s ease-in-out infinite 0.8s; }
+.ls-t3 { animation: lo-twinkle3 5.5s ease-in-out infinite 1.4s; }
+.ls-blink { animation: lo-blink 2s ease-in-out infinite; }
+
+.landing-wordmark {
+  font-size: clamp(36px, 6vw, 72px);
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  color: #dce4ee;
+  text-align: center;
+  position: relative;
+  z-index: 4;
+  animation: lo-breathe 6s ease-in-out infinite;
+}
+.landing-subtitle {
+  font-size: clamp(8px, 1vw, 11px);
+  letter-spacing: 0.24em;
+  color: #2e4a62;
+  text-align: center;
+  margin-top: 10px;
+  position: relative;
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+}
+.sw1 { animation: lo-w1 4s ease forwards; opacity: 0; }
+.sw2 { animation: lo-w2 4s ease forwards; opacity: 0; }
+.sw3 { animation: lo-w3 4s ease forwards; opacity: 0; }
+
+.landing-enter {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(9px, 1vw, 11px);
+  letter-spacing: 0.2em;
+  color: #7aaabf;
+  border: 1px solid #1a3448;
+  padding: 10px 42px;
+  background: rgba(10,22,34,0.5);
+  cursor: pointer;
+  position: relative;
+  z-index: 4;
+  margin-top: 28px;
+  animation: lo-pulse 3s ease-in-out infinite;
+  transition: color 0.2s;
+}
+.landing-enter:hover { color: #b8d8ee; }
+
+.landing-scene {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 2;
+}
+.landing-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 4;
+}
+.landing-breadcrumb {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(7px, 0.8vw, 9px);
+  letter-spacing: 0.18em;
+  color: #1e3248;
+  white-space: nowrap;
+  z-index: 5;
+  animation: lo-fadein 2s ease 2.5s both;
+}
+
+/* corner annotations */
+.anno {
+  position: absolute;
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(7px, 0.75vw, 9px);
+  letter-spacing: 0.12em;
+  color: #1e3a52;
+  z-index: 5;
+  line-height: 1.8;
+  animation: lo-fadein 1s ease forwards;
+}
+.anno span { display: block; }
+.anno-val { color: #2e5a72; }
+.anno-divider { width: 24px; height: 1px; background: #1a3448; margin: 4px 0; }
+.anno-tl { top: 20px; left: 24px; animation-delay: 0.5s; opacity: 0; }
+.anno-tr { top: 20px; right: 24px; text-align: right; animation-delay: 0.8s; opacity: 0; }
+.anno-bl { bottom: 40px; left: 24px; animation-delay: 1s; opacity: 0; }
+.anno-br { bottom: 40px; right: 24px; text-align: right; animation-delay: 1.2s; opacity: 0; }
+.anno-tr .anno-divider { margin-left: auto; }
+.anno-br .anno-divider { margin-left: auto; }

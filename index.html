@@ -4,6 +4,7 @@
     html, body { margin: 0; padding: 0; overflow: hidden; background: #06080f; }
   </style>
   <link rel="stylesheet" href="fp.css">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://www.cs.unm.edu/~angel/WebGL/7E/Common/initShaders.js" defer></script>
   <script src="https://www.cs.unm.edu/~angel/WebGL/7E/Common/MV.js" defer></script>
   <script src="https://cdn.jsdelivr.net/gh/brent-munsell/graphics/models/msphere.js" defer></script>
@@ -15,6 +16,109 @@
 <body>
 
   <canvas id="webgl-canvas"></canvas>
+
+  <!-- CINEMATIC LANDING OVERLAY -->
+  <div id="landing-overlay">
+
+    <div class="anno anno-tl">
+      <span>// ORRERY.01</span>
+      <div class="anno-divider"></div>
+      <span>STAR <span class="anno-val">SOL G2V</span></span>
+      <span>SYSTEM <span class="anno-val">SOL</span></span>
+      <span>PLANETS <span class="anno-val">8</span></span>
+    </div>
+
+    <div class="anno anno-tr">
+      <span>RAW WEBGL</span>
+      <div class="anno-divider"></div>
+      <span>RENDERER <span class="anno-val">ACTIVE</span></span>
+      <span>MODE <span class="anno-val">SOLAR</span></span>
+      <span>DATE <span class="anno-val" id="landing-date">J2026.161</span></span>
+    </div>
+
+    <div class="landing-center">
+      <div class="landing-wordmark">ORRERY</div>
+      <div class="landing-subtitle">
+        <span class="sw1">MILKY WAY</span>
+        <span class="sw2">&nbsp;·&nbsp;SOL SYSTEM</span>
+        <span class="sw3">&nbsp;·&nbsp;THIRD PLANET</span>
+      </div>
+      <button class="landing-enter" id="btn-enter">ENTER</button>
+    </div>
+
+    <svg class="landing-scene" viewBox="0 0 1400 500" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+      <g transform="translate(0, -300)">
+      <defs>
+        <radialGradient id="sunglow-l" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#f0a020" stop-opacity="0.4"/>
+          <stop offset="45%" stop-color="#e07010" stop-opacity="0.13"/>
+          <stop offset="100%" stop-color="#e07010" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="earthglow-l" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#2d7dd2" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="#2d7dd2" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="horizon-l" cx="50%" cy="100%" r="55%" fx="50%" fy="100%">
+          <stop offset="0%" stop-color="#e88020" stop-opacity="0.1"/>
+          <stop offset="100%" stop-color="#e88020" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="1400" height="500" fill="url(#horizon-l)"/>
+      <!-- stars -->
+      <g fill="#c8d4e0">
+        <circle class="ls-t1" cx="80" cy="60" r="1"/><circle class="ls-t2" cx="220" cy="30" r="0.8"/><circle class="ls-t3" cx="380" cy="80" r="1.1"/><circle class="ls-t1" cx="600" cy="20" r="0.9"/><circle class="ls-t2" cx="800" cy="55" r="0.8"/><circle class="ls-t3" cx="1000" cy="25" r="1"/><circle class="ls-t1" cx="1150" cy="70" r="0.9"/><circle class="ls-t2" cx="1300" cy="40" r="0.8"/><circle class="ls-t3" cx="50" cy="140" r="0.7"/><circle class="ls-t1" cx="1350" cy="120" r="0.9"/><circle class="ls-t2" cx="160" cy="180" r="0.8"/><circle class="ls-t3" cx="1240" cy="160" r="0.7"/><circle class="ls-t1" cx="480" cy="45" r="0.8"/><circle class="ls-t2" cx="920" cy="38" r="0.9"/>
+      </g>
+      <!-- orbital rings -->
+      <ellipse cx="700" cy="900" rx="1180" ry="295" fill="none" stroke="#0a1c2c" stroke-width="1" opacity="0.5"/>
+      <ellipse cx="700" cy="860" rx="940" ry="235" fill="none" stroke="#0a1e30" stroke-width="1" opacity="0.6"/>
+      <ellipse cx="700" cy="830" rx="730" ry="183" fill="none" stroke="#1a3a52" stroke-width="1.8"/>
+      <ellipse cx="700" cy="806" rx="545" ry="136" fill="none" stroke="#0d2030" stroke-width="1.1" opacity="0.8"/>
+      <ellipse cx="700" cy="788" rx="388" ry="97" fill="none" stroke="#0f2535" stroke-width="1" opacity="0.85"/>
+      <ellipse cx="700" cy="775" rx="248" ry="62" fill="none" stroke="#152c40" stroke-width="0.9" opacity="0.9"/>
+      <ellipse cx="700" cy="766" rx="128" ry="32" fill="none" stroke="#152c40" stroke-width="0.8" opacity="0.8"/>
+      <!-- sun -->
+      <circle cx="700" cy="750" r="90" fill="url(#sunglow-l)"/>
+      <circle cx="700" cy="750" r="20" fill="#e89020" opacity="0.95"/>
+      <circle cx="700" cy="750" r="28" fill="none" stroke="#f0a030" stroke-width="0.8" opacity="0.3"/>
+      <circle cx="700" cy="750" r="36" fill="none" stroke="#f0a030" stroke-width="0.4" opacity="0.12"/>
+      <!-- sun label -->
+      <line x1="700" y1="730" x2="620" y2="660" stroke="#1a2e40" stroke-width="0.8"/>
+      <line x1="620" y1="660" x2="540" y2="660" stroke="#1a2e40" stroke-width="0.8"/>
+      <text x="420" y="657" fill="#1e3a50" font-family="monospace" font-size="13" letter-spacing="2">SOL · G2V</text>
+      <!-- earth glow + dot -->
+      <circle cx="1100" cy="690" r="42" fill="url(#earthglow-l)"/>
+      <circle cx="1100" cy="690" r="9" fill="#2d6db2" opacity="0.95"/>
+      <circle cx="1100" cy="690" r="4" fill="#3a7a9a" class="ls-blink"/>
+      <!-- earth YOU ARE HERE -->
+      <line x1="1100" y1="681" x2="1126" y2="648" stroke="#1e3a52" stroke-width="1"/>
+      <line x1="1126" y1="648" x2="1200" y2="648" stroke="#1e3a52" stroke-width="1"/>
+      <text x="1208" y="645" fill="#3a7a9a" font-family="monospace" font-size="13" letter-spacing="2">YOU ARE HERE</text>
+      <!-- other planets -->
+      <circle cx="886" cy="720" r="5.5" fill="#d4b060" opacity="0.65"/>
+      <circle cx="600" cy="738" r="4.5" fill="#c05030" opacity="0.65"/>
+      <circle cx="466" cy="748" r="12" fill="#c07828" opacity="0.5"/>
+      <circle cx="340" cy="758" r="10" fill="#c8b880" opacity="0.45"/>
+      <circle cx="802" cy="726" r="4" fill="#b0a890" opacity="0.55"/>
+      </g>
+    </svg>
+
+    <div class="anno anno-bl">
+      <span>DIST <span class="anno-val">1.00 AU</span></span>
+      <span>ORBIT <span class="anno-val">365.25 D</span></span>
+      <div class="anno-divider"></div>
+      <span>// EARTH</span>
+    </div>
+
+    <div class="anno anno-br">
+      <span>LAT <span class="anno-val" id="landing-lat">--.-°</span></span>
+      <span>LON <span class="anno-val" id="landing-lon">--.-°</span></span>
+      <div class="anno-divider"></div>
+      <span>// OBSERVER</span>
+    </div>
+
+    <div class="landing-breadcrumb">SOL &nbsp;·&nbsp; ORION ARM &nbsp;·&nbsp; MILKY WAY &nbsp;·&nbsp; LOCAL GROUP</div>
+  </div>
+
   <div id="planet-label"></div>
 
   <div class="planet-bar">

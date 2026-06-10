@@ -806,6 +806,31 @@ document.getElementById("reset_ss").addEventListener("click", function() {
 });
 
 // ============================================================
+// Cinematic landing overlay
+// ============================================================
+function initLanding() {
+  // populate Julian date
+  const now = new Date();
+  const jd = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  document.getElementById('landing-date').textContent = `J${now.getFullYear()}.${jd}`;
+
+  // populate observer lat/lon if available
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      document.getElementById('landing-lat').textContent = `${pos.coords.latitude.toFixed(1)}°`;
+      document.getElementById('landing-lon').textContent = `${pos.coords.longitude.toFixed(1)}°`;
+    });
+  }
+
+  document.getElementById('btn-enter').addEventListener('click', () => {
+    const overlay = document.getElementById('landing-overlay');
+    overlay.classList.add('fade-out');
+    setTimeout(() => { overlay.style.display = 'none'; }, 1200);
+  });
+}
+
+
+// ============================================================
 // Init
 // ============================================================
 createVertexData();
@@ -814,6 +839,7 @@ createTexCoordData();
 configure();
 loadTextures();
 allocateMemory();
+initLanding();
 function loop() {
   draw();
   requestAnimationFrame(loop);
